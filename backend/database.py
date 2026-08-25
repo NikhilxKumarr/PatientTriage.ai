@@ -14,7 +14,6 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-
 def init_db():
     conn = get_connection()
 
@@ -25,11 +24,14 @@ def init_db():
             result TEXT NOT NULL,
             decision TEXT DEFAULT 'PENDING',
             note TEXT DEFAULT '',
-            is_demo INTEGER DEFAULT 0
+            is_demo INTEGER DEFAULT 0,
+            arrival_time TEXT,
+            reassessment_due_at TEXT,
+            queue_status TEXT DEFAULT 'WAITING',
+            last_reassessment TEXT
         )
     """)
 
-    # Support databases created before is_demo existed.
     columns = [
         row["name"]
         for row in conn.execute(
@@ -37,34 +39,60 @@ def init_db():
         ).fetchall()
     ]
 
-    if "is_demo" not in columns:
-        conn.execute(
-            "ALTER TABLE patients ADD COLUMN is_demo INTEGER DEFAULT 0"
-        )
+    migrations = {
+        "is_demo": "ALTER TABLE patients ADD COLUMN is_demo INTEGER DEFAULT 0",
+        "arrival_time": "ALTER TABLE patients ADD COLUMN arrival_time TEXT",
+        "reassessment_due_at": (
+            "ALTER TABLE patients ADD COLUMN reassessment_due_at TEXT"
+        ),
+        "queue_status": (
+            "ALTER TABLE patients ADD COLUMN queue_status TEXT DEFAULT 'WAITING'"
+        ),
+        "last_reassessment": (
+            "ALTER TABLE patients ADD COLUMN last_reassessment TEXT"
+        ),
+    }
+
+    for column, sql in migrations.items():
+        if column not in columns:
+            conn.execute(sql)
 
     conn.commit()
     conn.close()
-
 
 def save_patient(
     patient_id,
     data,
     result,
-    is_demo=False
+    is_demo=False,
+    arrival_time=None,
+    reassessment_due_at=None,
+    queue_status="WAITING"
 ):
     conn = get_connection()
 
     conn.execute(
         """
         INSERT INTO patients
-        (id, data, result, is_demo)
-        VALUES (?, ?, ?, ?)
+        (
+            id,
+            data,
+            result,
+            is_demo,
+            arrival_time,
+            reassessment_due_at,
+            queue_status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             patient_id,
             json.dumps(data),
             json.dumps(result),
-            1 if is_demo else 0
+            1 if is_demo else 0,
+            arrival_time,
+            reassessment_due_at,
+            queue_status
         )
     )
 
@@ -124,6 +152,35 @@ def get_demo_patients():
         })
 
     return patients
+
+def get_queue_patients():
+    conn = get_connection()
+
+    rows = conn.execute(
+        """
+        SELECT * FROM patients
+        ORDER BY rowid ASC
+        """
+    ).fetchall()
+
+    conn.close()
+
+    patients = []
+
+    for row in rows:
+        result = json.loads(row["result"])
+
+        patients.append({
+            "patient_id": row["id"],
+            **result,
+            "decision": row["decision"],
+            "note": row["note"],
+            "is_demo": bool(row["is_demo"])
+        })
+
+    return patients
+
+
 
 
 def clear_demo_patients():

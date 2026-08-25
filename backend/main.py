@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from uuid import uuid4
@@ -5,11 +6,13 @@ from uuid import uuid4
 from schemas import PatientInput, NurseDecision
 from model import predict_risk
 from demo import SIMULATED_PATIENTS
+
 from database import (
     init_db,
     save_patient,
     get_patients,
     get_demo_patients,
+    get_queue_patients,
     clear_demo_patients,
     get_patient,
     update_decision
@@ -238,11 +241,11 @@ def assess_age_specific_safety(
         "reasons": reasons
     }
 
-
 def process_patient(
     patient: PatientInput,
     is_demo: bool = False
 ) -> dict:
+
     patient_data = patient.model_dump()
 
     # -----------------------------------------
@@ -364,6 +367,19 @@ def process_patient(
         reassessment = 60
 
     # -----------------------------------------
+    # QUEUE TIMING
+    # -----------------------------------------
+
+    arrival_time = datetime.now(timezone.utc)
+
+    reassessment_due_at = (
+        arrival_time
+        + timedelta(minutes=reassessment)
+    )
+
+    queue_status = "WAITING"
+
+    # -----------------------------------------
     # KEY CLINICAL FACTORS
     # -----------------------------------------
 
@@ -460,15 +476,24 @@ def process_patient(
         "recommended_action": action,
         "reassessment_minutes": reassessment,
 
+        # Queue information
+        "arrival_time": arrival_time.isoformat(),
+        "reassessment_due_at": reassessment_due_at.isoformat(),
+        "queue_status": queue_status,
+        "last_reassessment": None,
+
+        # Round 2 data-model fields
         "age_group": age_group,
         "history_available": patient.history_available,
         "data_completeness": data_completeness,
         "missing_fields": missing_fields,
 
+        # Uncertainty
         "confidence": uncertainty["confidence"],
         "uncertainty": uncertainty["uncertainty"],
         "safety_flags": uncertainty["safety_flags"],
 
+        # Age-specific safety
         "age_safety": {
             "risk_adjustment": age_safety["risk_adjustment"],
             "reasons": age_safety["reasons"]
@@ -478,11 +503,18 @@ def process_patient(
         "nurse_confirmation_required": True
     }
 
+    # -----------------------------------------
+    # SAVE PATIENT
+    # -----------------------------------------
+
     save_patient(
         result["patient_id"],
         patient_data,
         result,
-        is_demo=is_demo
+        is_demo=is_demo,
+        arrival_time=result["arrival_time"],
+        reassessment_due_at=result["reassessment_due_at"],
+        queue_status=result["queue_status"]
     )
 
     return result
@@ -589,6 +621,70 @@ def nurse_decision(
         "status": "recorded"
     }
 
+# -----------------------------------------
+# SURGE QUEUE
+# -----------------------------------------
+
+@app.get("/queue")
+def queue():
+
+    patients = get_queue_patients()
+
+    if not patients:
+        return {
+            "queue_status": "EMPTY",
+            "patients": [],
+            "total_patients": 0
+        }
+
+    # Only active waiting patients belong in the queue.
+    waiting = [
+        patient
+        for patient in patients
+        if patient.get("queue_status") == "WAITING"
+    ]
+
+    # Priority order:
+    # CRITICAL > HIGH > MEDIUM > LOW
+    risk_priority = {
+        "CRITICAL": 4,
+        "HIGH": 3,
+        "MEDIUM": 2,
+        "LOW": 1
+    }
+
+    def queue_priority(patient):
+        risk = risk_priority.get(
+            patient.get("risk_level"),
+            0
+        )
+
+        uncertainty = (
+            1
+            if patient.get("uncertainty") == "HIGH"
+            else 0
+        )
+
+        return (
+            -risk,
+            -uncertainty,
+            patient.get("arrival_time", "")
+        )
+
+    waiting.sort(key=queue_priority)
+
+    return {
+        "queue_status": (
+            "SURGE"
+            if len(waiting) >= 40
+            else "NORMAL"
+        ),
+        "total_patients": len(waiting),
+        "patients": waiting
+    }
+
+
+
 
 # -----------------------------------------
 # ROUND 2 DEMO
@@ -675,3 +771,45 @@ def demo_summary():
             summary["age_groups"][age_group] += 1
 
     return summary
+
+
+# -----------------------------------------
+# ROUND 2 SURGE SIMULATION
+# -----------------------------------------
+
+@app.post("/demo/surge")
+def simulate_surge():
+
+    # Start with a clean demo queue.
+    deleted = clear_demo_patients()
+
+    created = []
+
+    # 3x normal emergency-department volume.
+    # Existing demo dataset contains 20 patients.
+    surge_patients = (
+        SIMULATED_PATIENTS
+        + SIMULATED_PATIENTS
+        + SIMULATED_PATIENTS
+    )
+
+    for patient_data in surge_patients:
+
+        patient = PatientInput(**patient_data)
+
+        result = process_patient(
+            patient,
+            is_demo=True
+        )
+
+        created.append(result)
+
+    return {
+        "status": "surge_simulated",
+        "previous_demo_patients_removed": deleted,
+        "normal_volume": len(SIMULATED_PATIENTS),
+        "surge_multiplier": 3,
+        "patients_created": len(created),
+        "queue_status": "SURGE",
+        "patients": created
+    }
