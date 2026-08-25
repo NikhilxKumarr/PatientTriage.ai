@@ -20,6 +20,232 @@ app = FastAPI(
 )
 
 
+def get_age_group(age: int) -> str:
+    if age < 18:
+        return "PEDIATRIC"
+
+    if age >= 65:
+        return "GERIATRIC"
+
+    return "ADULT"
+
+
+def assess_uncertainty(
+    data_completeness: float,
+    missing_fields: list,
+    patient: PatientInput
+) -> dict:
+
+    safety_flags = []
+
+    if data_completeness >= 0.9:
+        confidence = "HIGH"
+        uncertainty = "LOW"
+
+    elif data_completeness >= 0.6:
+        confidence = "MEDIUM"
+        uncertainty = "MEDIUM"
+
+    else:
+        confidence = "LOW"
+        uncertainty = "HIGH"
+
+    if not patient.history_available:
+        safety_flags.append(
+            "Medical history unavailable"
+        )
+
+    if missing_fields:
+        safety_flags.append(
+            f"{len(missing_fields)} required data fields unavailable"
+        )
+
+    complaint = (
+        patient.chief_complaint or ""
+    ).strip().lower()
+
+    ambiguous_terms = [
+        "don't feel right",
+        "feel strange",
+        "feeling strange",
+        "weak",
+        "unwell",
+        "not sure",
+        "unknown"
+    ]
+
+    if any(
+        term in complaint
+        for term in ambiguous_terms
+    ):
+        safety_flags.append(
+            "Ambiguous presenting complaint"
+        )
+
+        if confidence == "HIGH":
+            confidence = "MEDIUM"
+            uncertainty = "MEDIUM"
+
+        elif confidence == "MEDIUM":
+            confidence = "LOW"
+            uncertainty = "HIGH"
+
+    return {
+        "confidence": confidence,
+        "uncertainty": uncertainty,
+        "safety_flags": safety_flags
+    }
+
+
+def assess_age_specific_safety(
+    patient: PatientInput,
+    age_group: str
+) -> dict:
+
+    safety_flags = []
+    reasons = []
+
+    risk_adjustment = "NONE"
+
+    # -----------------------------------------
+    # PEDIATRIC SAFETY CHECKS
+    # -----------------------------------------
+
+    if age_group == "PEDIATRIC":
+
+        if (
+            patient.temperature is not None
+            and patient.temperature >= 38.5
+        ):
+            safety_flags.append(
+                "Pediatric fever requires age-specific review"
+            )
+
+            reasons.append(
+                f"Temperature {patient.temperature}°C in a pediatric patient"
+            )
+
+        if (
+            patient.heart_rate is not None
+            and patient.heart_rate >= 140
+        ):
+            safety_flags.append(
+                "Elevated pediatric heart rate"
+            )
+
+            reasons.append(
+                f"Heart rate {patient.heart_rate} bpm"
+            )
+
+        if (
+            patient.respiratory_rate is not None
+            and patient.respiratory_rate >= 30
+        ):
+            safety_flags.append(
+                "Elevated pediatric respiratory rate"
+            )
+
+            reasons.append(
+                f"Respiratory rate {patient.respiratory_rate} breaths/min"
+            )
+
+        if (
+            patient.spo2 is not None
+            and patient.spo2 < 94
+        ):
+            safety_flags.append(
+                "Low oxygen saturation in pediatric patient"
+            )
+
+            reasons.append(
+                f"SpO₂ {patient.spo2}%"
+            )
+
+        if patient.confusion:
+            safety_flags.append(
+                "Altered mental status in pediatric patient"
+            )
+
+            reasons.append(
+                "Confusion reported"
+            )
+
+        if patient.shortness_breath:
+            safety_flags.append(
+                "Breathing difficulty in pediatric patient"
+            )
+
+            reasons.append(
+                "Shortness of breath reported"
+            )
+
+    # -----------------------------------------
+    # GERIATRIC SAFETY CHECKS
+    # -----------------------------------------
+
+    elif age_group == "GERIATRIC":
+
+        if patient.confusion:
+            safety_flags.append(
+                "Altered mental status in geriatric patient"
+            )
+
+            reasons.append(
+                "Confusion reported"
+            )
+
+        if patient.weakness:
+            safety_flags.append(
+                "Weakness in geriatric patient"
+            )
+
+            reasons.append(
+                "Weakness reported"
+            )
+
+        if (
+            patient.spo2 is not None
+            and patient.spo2 < 94
+        ):
+            safety_flags.append(
+                "Low oxygen saturation in geriatric patient"
+            )
+
+            reasons.append(
+                f"SpO₂ {patient.spo2}%"
+            )
+
+        if (
+            patient.heart_rate is not None
+            and patient.heart_rate >= 120
+        ):
+            safety_flags.append(
+                "Elevated heart rate in geriatric patient"
+            )
+
+            reasons.append(
+                f"Heart rate {patient.heart_rate} bpm"
+            )
+
+        if not patient.history_available:
+            safety_flags.append(
+                "Limited medical history in geriatric patient"
+            )
+
+            reasons.append(
+                "Historical clinical information unavailable"
+            )
+
+    if safety_flags:
+        risk_adjustment = "REVIEW_REQUIRED"
+
+    return {
+        "risk_adjustment": risk_adjustment,
+        "safety_flags": safety_flags,
+        "reasons": reasons
+    }
+
+
 # Allow React frontend to communicate with FastAPI.
 app.add_middleware(
     CORSMiddleware,
@@ -48,11 +274,108 @@ def intake(patient: PatientInput):
 
     patient_data = patient.model_dump()
 
+    # -----------------------------------------
+    # AGE GROUP
+    # -----------------------------------------
+
+    age_group = get_age_group(patient.age)
+
+    age_safety = assess_age_specific_safety(
+        patient,
+        age_group
+    )
+
+    # -----------------------------------------
+    # DATA COMPLETENESS
+    # -----------------------------------------
+
+    required_fields = [
+        "heart_rate",
+        "spo2",
+        "systolic_bp",
+        "temperature",
+        "respiratory_rate",
+        "pain_level",
+    ]
+
+    missing_fields = [
+        field
+        for field in required_fields
+        if patient_data.get(field) is None
+    ]
+
+    available_count = (
+        len(required_fields) - len(missing_fields)
+    )
+
+    vital_completeness = (
+        available_count / len(required_fields)
+    )
+
+    history_completeness = (
+        1.0 if patient.history_available else 0.0
+    )
+
+    data_completeness = round(
+        (vital_completeness * 0.70)
+        + (history_completeness * 0.30),
+        2
+    )
+
+    if not patient.history_available:
+        missing_fields.append(
+            "medical_history"
+        )
+
+    # -----------------------------------------
+    # MODEL PREDICTION
+    # -----------------------------------------
+
     prediction = predict_risk(patient_data)
+
+    model_missing_fields = prediction.get(
+        "missing_features",
+        []
+    )
+
+    for field in model_missing_fields:
+        if field not in missing_fields:
+            missing_fields.append(field)
+
+    # -----------------------------------------
+    # UNCERTAINTY
+    # -----------------------------------------
+
+    uncertainty = assess_uncertainty(
+        data_completeness,
+        missing_fields,
+        patient
+    )
+
+    uncertainty["safety_flags"].extend(
+        age_safety["safety_flags"]
+    )
 
     risk_level = prediction["risk_level"]
 
-    # Prototype recommendation logic.
+    original_risk_level = risk_level
+
+    # Safety-first escalation.
+    if (
+        uncertainty["uncertainty"] == "HIGH"
+        and risk_level == "LOW"
+    ):
+        risk_level = "MEDIUM"
+
+    if risk_level != original_risk_level:
+        uncertainty["safety_flags"].append(
+            "Risk escalated because of high uncertainty"
+        )
+
+    # -----------------------------------------
+    # RECOMMENDED ACTION
+    # -----------------------------------------
+
     if risk_level == "CRITICAL":
         action = "Immediate clinical assessment"
         reassessment = 5
@@ -69,7 +392,10 @@ def intake(patient: PatientInput):
         action = "Routine assessment"
         reassessment = 60
 
-    # Identify important factors for the report card.
+    # -----------------------------------------
+    # KEY CLINICAL FACTORS
+    # -----------------------------------------
+
     factors = []
 
     if patient.chest_pain:
@@ -107,21 +433,30 @@ def intake(patient: PatientInput):
             "detail": "Significant bleeding reported"
         })
 
-    if patient.heart_rate >= 120:
+    if (
+        patient.heart_rate is not None
+        and patient.heart_rate >= 120
+    ):
         factors.append({
             "factor": "Elevated heart rate",
             "impact": "MEDIUM",
             "detail": f"{patient.heart_rate} bpm"
         })
 
-    if patient.spo2 < 94:
+    if (
+        patient.spo2 is not None
+        and patient.spo2 < 94
+    ):
         factors.append({
             "factor": "Low SpO₂",
             "impact": "HIGH",
             "detail": f"{patient.spo2}% oxygen saturation"
         })
 
-    if patient.pain_level >= 7:
+    if (
+        patient.pain_level is not None
+        and patient.pain_level >= 7
+    ):
         factors.append({
             "factor": "Severe pain",
             "impact": "MEDIUM",
@@ -142,6 +477,10 @@ def intake(patient: PatientInput):
             "detail": "Previous stroke reported"
         })
 
+    # -----------------------------------------
+    # FINAL RESULT
+    # -----------------------------------------
+
     result = {
         "patient_id": f"PT-{str(uuid4())[:8].upper()}",
         "risk_level": risk_level,
@@ -149,6 +488,21 @@ def intake(patient: PatientInput):
         "risk_score": prediction["risk_score"],
         "recommended_action": action,
         "reassessment_minutes": reassessment,
+
+        "age_group": age_group,
+        "history_available": patient.history_available,
+        "data_completeness": data_completeness,
+        "missing_fields": missing_fields,
+
+        "confidence": uncertainty["confidence"],
+        "uncertainty": uncertainty["uncertainty"],
+        "safety_flags": uncertainty["safety_flags"],
+
+        "age_safety": {
+            "risk_adjustment": age_safety["risk_adjustment"],
+            "reasons": age_safety["reasons"]
+        },
+
         "key_factors": factors,
         "nurse_confirmation_required": True
     }
@@ -195,7 +549,11 @@ def nurse_decision(
             detail="Patient not found"
         )
 
-    allowed = ["ACCEPT", "MODIFY", "ESCALATE"]
+    allowed = [
+        "ACCEPT",
+        "MODIFY",
+        "ESCALATE"
+    ]
 
     if decision.decision not in allowed:
         raise HTTPException(

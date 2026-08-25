@@ -1136,3 +1136,98 @@ textarea:focus {
   font-size: 11px;
   line-height: 1.4;
 }
+
+
+.confidence-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 22px;
+  border-left: 1px solid #e4e8ee;
+  min-width: 150px;
+}
+
+.confidence-section > span {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #7d8795;
+}
+
+.confidence-section strong {
+  margin-top: 5px;
+  font-size: 18px;
+  text-transform: uppercase;
+}
+
+.confidence-section small {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #7d8795;
+  line-height: 1.4;
+}
+
+.confidence-section.high strong {
+  color: #237a4e;
+}
+
+.confidence-section.medium strong {
+  color: #b45c09;
+}
+
+.confidence-section.low strong {
+  color: #c62828;
+}
+
+.safety-panel {
+  margin: 18px 0;
+  padding: 18px 20px;
+  border: 1px solid #f0d89a;
+  border-radius: 11px;
+  background: #fffaf0;
+}
+
+.safety-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.safety-panel-heading h3 {
+  margin: 3px 0 0;
+  font-size: 15px;
+}
+
+.safety-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2c94c;
+  color: #604d00;
+  font-weight: 900;
+}
+
+.safety-block {
+  margin-top: 15px;
+}
+
+.safety-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #8b6d00;
+}
+
+.safety-block ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+}
+
+.safety-block li {
+  margin: 4px 0;
+  font-size: 11px;
+  color: #5f552f;
+}
