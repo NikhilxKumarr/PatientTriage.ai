@@ -1491,6 +1491,12 @@ textarea:focus {
 }
 
 
+
+
+
+
+
+
 /* ---------------------------------------------------------
    Queue card
    --------------------------------------------------------- */
@@ -1995,4 +2001,103 @@ textarea:focus {
 .reassess-button:hover {
   background: #fee2e2;
   border-color: #f87171;
+}
+
+
+.queue-health {
+  margin: 18px 0 24px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.queue-health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.queue-health-header h2 {
+  margin: 4px 0 0;
+}
+
+.health-status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.health-status.stable {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.health-status.danger {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.queue-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.health-metric {
+  padding: 15px;
+  border: 1px solid #edf0f3;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.health-metric > span {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+}
+
+.health-metric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.health-metric small {
+  display: block;
+  margin-top: 7px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.health-bar {
+  height: 5px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.health-bar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: #374151;
+}
+
+@media (max-width: 900px) {
+  .queue-health-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .queue-health-grid {
+    grid-template-columns: 1fr;
+  }
 }

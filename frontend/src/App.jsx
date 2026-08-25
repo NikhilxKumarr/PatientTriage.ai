@@ -994,6 +994,30 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
   const isSurge = patients.length >= 40;
 
+  const highRisk = critical + high;
+
+const highRiskPercent =
+  patients.length > 0
+    ? Math.round((highRisk / patients.length) * 100)
+    : 0;
+
+const pendingPercent =
+  patients.length > 0
+    ? Math.round((pending / patients.length) * 100)
+    : 0;
+
+const reassessmentPercent =
+  patients.length > 0
+    ? Math.round((reassessmentDue / patients.length) * 100)
+    : 0;
+
+const uncertaintyPercent =
+  patients.length > 0
+    ? Math.round((highUncertainty / patients.length) * 100)
+    : 0;
+
+
+
   const filteredPatients = patients.filter((patient) => {
     if (filter === "ALL") {
       return true;
@@ -1120,6 +1144,103 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
         <strong>{patients.length}</strong>
       </div>
     </div>
+
+
+
+
+{/* ----------------------------------------- */}
+{/* QUEUE HEALTH */}
+{/* ----------------------------------------- */}
+
+<div className="queue-health">
+
+  <div className="queue-health-header">
+    <div>
+      <p className="eyebrow">OPERATIONAL OVERVIEW</p>
+      <h2>Queue health</h2>
+    </div>
+
+    <span className={`health-status ${isSurge ? "danger" : "stable"}`}>
+      {isSurge ? "HIGH LOAD" : "STABLE"}
+    </span>
+  </div>
+
+  <div className="queue-health-grid">
+
+    <div className="health-metric">
+      <span>HIGH-RISK PATIENTS</span>
+
+      <strong>{highRiskPercent}%</strong>
+
+      <small>
+        {highRisk} of {patients.length} patients
+      </small>
+
+      <div className="health-bar">
+        <div
+          style={{
+            width: `${highRiskPercent}%`,
+          }}
+        />
+      </div>
+    </div>
+
+    <div className="health-metric">
+      <span>PENDING REVIEW</span>
+
+      <strong>{pendingPercent}%</strong>
+
+      <small>
+        {pending} patients
+      </small>
+
+      <div className="health-bar">
+        <div
+          style={{
+            width: `${pendingPercent}%`,
+          }}
+        />
+      </div>
+    </div>
+
+    <div className="health-metric">
+      <span>REASSESSMENT DUE</span>
+
+      <strong>{reassessmentPercent}%</strong>
+
+      <small>
+        {reassessmentDue} patients
+      </small>
+
+      <div className="health-bar">
+        <div
+          style={{
+            width: `${reassessmentPercent}%`,
+          }}
+        />
+      </div>
+    </div>
+
+    <div className="health-metric">
+      <span>HIGH UNCERTAINTY</span>
+
+      <strong>{uncertaintyPercent}%</strong>
+
+      <small>
+        {highUncertainty} patients
+      </small>
+
+      <div className="health-bar">
+        <div
+          style={{
+            width: `${uncertaintyPercent}%`,
+          }}
+        />
+      </div>
+    </div>
+
+  </div>
+</div>
 
     {/* ----------------------------------------- */}
     {/* PRIORITY QUEUE */}
