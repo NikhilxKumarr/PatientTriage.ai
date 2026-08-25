@@ -15,7 +15,8 @@ from database import (
     get_queue_patients,
     clear_demo_patients,
     get_patient,
-    update_decision
+    update_decision,
+    update_reassessment
 )
 
 
@@ -622,6 +623,60 @@ def nurse_decision(
     }
 
 # -----------------------------------------
+# PATIENT REASSESSMENT
+# -----------------------------------------
+
+@app.post("/patients/{patient_id}/reassess")
+def reassess_patient(patient_id: str):
+
+    patient = get_patient(patient_id)
+
+    if patient is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    result = patient["result"]
+
+    now = datetime.now(timezone.utc)
+
+    reassessment_minutes = result.get(
+        "reassessment_minutes",
+        30
+    )
+
+    new_due_time = (
+        now + timedelta(minutes=reassessment_minutes)
+    )
+
+    last_reassessment = now.isoformat()
+    reassessment_due_at = new_due_time.isoformat()
+
+    updated = update_reassessment(
+        patient_id,
+        last_reassessment,
+        reassessment_due_at,
+        "WAITING"
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update reassessment"
+        )
+
+    return {
+        "patient_id": patient_id,
+        "last_reassessment": last_reassessment,
+        "reassessment_due_at": reassessment_due_at,
+        "queue_status": "WAITING",
+        "reassessment_minutes": reassessment_minutes,
+        "status": "reassessed"
+    }
+
+
+# -----------------------------------------
 # SURGE QUEUE
 # -----------------------------------------
 
@@ -637,11 +692,14 @@ def queue():
             "total_patients": 0
         }
 
-    # Only active waiting patients belong in the queue.
-    waiting = [
+    # Include both active and reassessment-due patients.
+    active = [
         patient
         for patient in patients
-        if patient.get("queue_status") == "WAITING"
+        if patient.get("queue_status") in [
+            "WAITING",
+            "REASSESSMENT_DUE"
+        ]
     ]
 
     # Priority order:
@@ -654,9 +712,20 @@ def queue():
     }
 
     def queue_priority(patient):
+
         risk = risk_priority.get(
             patient.get("risk_level"),
             0
+        )
+
+        # Reassessment-due patients get additional priority.
+        reassessment_due = (
+            1
+           if patient.get("queue_status") in [
+            "WAITING",
+            "REASSESSMENT_DUE"
+        ]
+            else 0
         )
 
         uncertainty = (
@@ -666,23 +735,23 @@ def queue():
         )
 
         return (
+            -reassessment_due,
             -risk,
             -uncertainty,
             patient.get("arrival_time", "")
         )
 
-    waiting.sort(key=queue_priority)
+    active.sort(key=queue_priority)
 
     return {
         "queue_status": (
             "SURGE"
-            if len(waiting) >= 40
+            if len(active) >= 40
             else "NORMAL"
         ),
-        "total_patients": len(waiting),
-        "patients": waiting
+        "total_patients": len(active),
+        "patients": active
     }
-
 
 
 

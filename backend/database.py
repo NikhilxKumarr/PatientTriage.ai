@@ -154,6 +154,8 @@ def get_demo_patients():
     return patients
 
 def get_queue_patients():
+    from datetime import datetime, timezone
+
     conn = get_connection()
 
     rows = conn.execute(
@@ -163,12 +165,53 @@ def get_queue_patients():
         """
     ).fetchall()
 
-    conn.close()
-
     patients = []
+
+    now = datetime.now(timezone.utc)
 
     for row in rows:
         result = json.loads(row["result"])
+
+        queue_status = result.get(
+            "queue_status",
+            row["queue_status"] or "WAITING"
+        )
+
+        due_at = result.get(
+            "reassessment_due_at",
+            row["reassessment_due_at"]
+        )
+
+        # Automatically mark overdue patients.
+        if (
+            queue_status == "WAITING"
+            and due_at
+        ):
+            try:
+                due_time = datetime.fromisoformat(
+                    due_at
+                )
+
+                if due_time <= now:
+                    queue_status = "REASSESSMENT_DUE"
+
+                    result["queue_status"] = queue_status
+
+                    conn.execute(
+                        """
+                        UPDATE patients
+                        SET result = ?, queue_status = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            json.dumps(result),
+                            queue_status,
+                            row["id"]
+                        )
+                    )
+
+            except ValueError:
+                pass
 
         patients.append({
             "patient_id": row["id"],
@@ -177,6 +220,9 @@ def get_queue_patients():
             "note": row["note"],
             "is_demo": bool(row["is_demo"])
         })
+
+    conn.commit()
+    conn.close()
 
     return patients
 
@@ -220,7 +266,6 @@ def get_patient(patient_id):
         "is_demo": bool(row["is_demo"])
     }
 
-
 def update_decision(patient_id, decision, note):
     conn = get_connection()
 
@@ -239,3 +284,44 @@ def update_decision(patient_id, decision, note):
 
     conn.commit()
     conn.close()
+
+
+def update_reassessment(
+    patient_id,
+    last_reassessment,
+    reassessment_due_at,
+    queue_status
+):
+    conn = get_connection()
+
+    row = conn.execute(
+        "SELECT result FROM patients WHERE id = ?",
+        (patient_id,)
+    ).fetchone()
+
+    if row is None:
+        conn.close()
+        return False
+
+    result = json.loads(row["result"])
+
+    result["last_reassessment"] = last_reassessment
+    result["reassessment_due_at"] = reassessment_due_at
+    result["queue_status"] = queue_status
+
+    conn.execute(
+        """
+        UPDATE patients
+        SET result = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(result),
+            patient_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return True

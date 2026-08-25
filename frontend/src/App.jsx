@@ -163,36 +163,43 @@ function App() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/patients`);
+      const response = await fetch(`${API_URL}/queue`);
 
       if (!response.ok) {
-        throw new Error("Unable to load patients");
+        throw new Error("Unable to load patient queue");
       }
 
       const data = await response.json();
 
-      const order = {
-        CRITICAL: 4,
-        HIGH: 3,
-        MEDIUM: 2,
-        LOW: 1,
-      };
-
-      data.sort((a, b) => {
-        if (order[b.risk_level] !== order[a.risk_level]) {
-          return order[b.risk_level] - order[a.risk_level];
-        }
-
-        return b.risk_score - a.risk_score;
-      });
-
-      setPatients(data);
+      setPatients(data.patients || []);
     } catch (err) {
-      setError("Could not load patients. Make sure FastAPI is running.");
+      console.error(err);
+      setError("Could not load patient queue. Make sure FastAPI is running.");
     } finally {
       setDashboardLoading(false);
     }
   }
+
+  async function handleReassess(patientId) {
+  try {
+    const response = await fetch(
+      `${API_URL}/patients/${patientId}/reassess`,
+      {
+        method: "POST",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to reassess patient");
+    }
+
+    await loadPatients();
+
+  } catch (error) {
+    console.error("Reassessment failed:", error);
+    alert("Failed to reassess patient.");
+  }
+}
 
   function openDashboard() {
     setPage("dashboard");
@@ -578,100 +585,92 @@ function App() {
               </div>
             </div>
 
+            <div className="score-card">
+              {/* Score */}
+              <div className="score-section">
+                <div className="score">
+                  {result.risk_score}
+                  <span>/100</span>
+                </div>
 
-        <div className="score-card">
-          {/* Score */}
-          <div className="score-section">
-            <div className="score">
-              {result.risk_score}
-              <span>/100</span>
-            </div>
-
-            <div className="score-label">AI TRIAGE RISK SCORE</div>
-          </div>
-
-          {/* Probability */}
-          <div className="probability-section">
-            <span>MODEL PROBABILITY</span>
-
-            <strong>
-              {(result.risk_probability * 100).toFixed(1)}%
-            </strong>
-
-            <div className="probability-bar">
-              <div
-                style={{
-                  width: `${result.risk_probability * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Confidence */}
-          {result.confidence && (
-            <div
-              className={`confidence-section ${result.confidence.toLowerCase()}`}
-            >
-              <span>MODEL CONFIDENCE</span>
-
-              <strong>{result.confidence}</strong>
-
-              <small>
-                {result.uncertainty === "HIGH"
-                  ? "High uncertainty — clinical review required"
-                  : result.uncertainty === "MEDIUM"
-                  ? "Moderate uncertainty — review recommended"
-                  : "Low uncertainty"}
-              </small>
-            </div>
-          )}
-        </div>
-
-        {/* Safety panel OUTSIDE score-card */}
-        {(result.safety_flags?.length > 0 ||
-          result.age_safety?.risk_adjustment === "REVIEW_REQUIRED") && (
-          <div className="safety-panel">
-            <div className="safety-panel-heading">
-              <div className="safety-icon">!</div>
-
-              <div>
-                <p className="eyebrow">SAFETY REVIEW</p>
-                <h3>Additional clinical review recommended</h3>
+                <div className="score-label">AI TRIAGE RISK SCORE</div>
               </div>
+
+              {/* Probability */}
+              <div className="probability-section">
+                <span>MODEL PROBABILITY</span>
+
+                <strong>{(result.risk_probability * 100).toFixed(1)}%</strong>
+
+                <div className="probability-bar">
+                  <div
+                    style={{
+                      width: `${result.risk_probability * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Confidence */}
+              {result.confidence && (
+                <div
+                  className={`confidence-section ${result.confidence.toLowerCase()}`}
+                >
+                  <span>MODEL CONFIDENCE</span>
+
+                  <strong>{result.confidence}</strong>
+
+                  <small>
+                    {result.uncertainty === "HIGH"
+                      ? "High uncertainty — clinical review required"
+                      : result.uncertainty === "MEDIUM"
+                        ? "Moderate uncertainty — review recommended"
+                        : "Low uncertainty"}
+                  </small>
+                </div>
+              )}
             </div>
 
-            {result.age_safety?.reasons?.length > 0 && (
-              <div className="safety-block">
-                <span className="safety-label">
-                  {result.age_group} SAFETY CONSIDERATIONS
-                </span>
+            {/* Safety panel OUTSIDE score-card */}
+            {(result.safety_flags?.length > 0 ||
+              result.age_safety?.risk_adjustment === "REVIEW_REQUIRED") && (
+              <div className="safety-panel">
+                <div className="safety-panel-heading">
+                  <div className="safety-icon">!</div>
 
-                <ul>
-                  {result.age_safety.reasons.map((reason, index) => (
-                    <li key={index}>{reason}</li>
-                  ))}
-                </ul>
+                  <div>
+                    <p className="eyebrow">SAFETY REVIEW</p>
+                    <h3>Additional clinical review recommended</h3>
+                  </div>
+                </div>
+
+                {result.age_safety?.reasons?.length > 0 && (
+                  <div className="safety-block">
+                    <span className="safety-label">
+                      {result.age_group} SAFETY CONSIDERATIONS
+                    </span>
+
+                    <ul>
+                      {result.age_safety.reasons.map((reason, index) => (
+                        <li key={index}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {result.safety_flags?.length > 0 && (
+                  <div className="safety-block">
+                    <span className="safety-label">SAFETY FLAGS</span>
+
+                    <ul>
+                      {result.safety_flags.map((flag, index) => (
+                        <li key={index}>{flag}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
-
-            {result.safety_flags?.length > 0 && (
-              <div className="safety-block">
-                <span className="safety-label">SAFETY FLAGS</span>
-
-                <ul>
-                  {result.safety_flags.map((flag, index) => (
-                    <li key={index}>{flag}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-
-
-
-
 
             {result.patient_data && (
               <div className="card patient-detail-card">
@@ -808,7 +807,6 @@ function App() {
               {result.key_factors.length > 0 ? (
                 <div className="factor-list">
                   {result.key_factors.map((factor, index) => (
-
                     <div className="factor" key={index}>
                       <div className="factor-main">
                         <div
@@ -828,8 +826,6 @@ function App() {
                         {factor.impact} IMPACT
                       </span>
                     </div>
-
-                    
                   ))}
                 </div>
               ) : (
@@ -937,9 +933,47 @@ function App() {
     </div>
   );
 }
-
 function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
   const [filter, setFilter] = useState("ALL");
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  function getRemainingSeconds(patient) {
+    if (!patient.reassessment_due_at) {
+      return null;
+    }
+
+    const dueTime = new Date(patient.reassessment_due_at).getTime();
+
+    return Math.max(0, Math.floor((dueTime - currentTime) / 1000));
+  }
+
+  function formatQueueTime(seconds) {
+    if (seconds === null) {
+      return "--:--";
+    }
+
+    if (seconds <= 0) {
+      return "DUE";
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(
+      2,
+      "0",
+    )}`;
+  }
+
   const critical = patients.filter((p) => p.risk_level === "CRITICAL").length;
 
   const high = patients.filter((p) => p.risk_level === "HIGH").length;
@@ -950,154 +984,424 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
   const pending = patients.filter((p) => p.decision === "PENDING").length;
 
+  const highUncertainty = patients.filter(
+    (p) => p.uncertainty === "HIGH",
+  ).length;
+
+  const reassessmentDue = patients.filter(
+    (p) => p.queue_status === "REASSESSMENT_DUE",
+  ).length;
+
+  const isSurge = patients.length >= 40;
+
   const filteredPatients = patients.filter((patient) => {
-    if (filter === "ALL") return true;
+    if (filter === "ALL") {
+      return true;
+    }
 
     if (filter === "PENDING") {
       return patient.decision === "PENDING";
+    }
+
+    if (filter === "UNCERTAIN") {
+      return patient.uncertainty === "HIGH";
+    }
+
+    if (filter === "REASSESSMENT") {
+      return patient.queue_status === "REASSESSMENT_DUE";
     }
 
     return patient.risk_level === filter;
   });
 
   return (
-    <section>
-      <div className="dashboard-heading">
-        <div>
-          <p className="eyebrow">NURSE WORKSPACE</p>
+  <section>
+    {/* ----------------------------------------- */}
+    {/* DASHBOARD HEADER */}
+    {/* ----------------------------------------- */}
 
-          <h1>Patient priority queue</h1>
+    <div className="dashboard-heading">
+      <div>
+        <p className="eyebrow">NURSE WORKSPACE</p>
 
-          <p>
-            AI-assisted prioritization with nurse-controlled clinical decisions.
-          </p>
+        <h1>Patient priority queue</h1>
+
+        <p>
+          AI-assisted prioritization with nurse-controlled clinical decisions.
+        </p>
+      </div>
+
+      <div className="dashboard-actions">
+        <div className={`queue-mode ${isSurge ? "surge" : "normal"}`}>
+          <span className="queue-mode-dot"></span>
+
+          {isSurge ? "SURGE MODE" : "NORMAL LOAD"}
         </div>
 
-        <button className="refresh-button" onClick={onRefresh}>
+        <button
+          className="refresh-button"
+          onClick={onRefresh}
+        >
           ↻ Refresh
         </button>
       </div>
-      <div className="stats">
-        <div className="stat critical">
-          <span>CRITICAL</span>
-          <strong>{critical}</strong>
-        </div>
+    </div>
 
-        <div className="stat high">
-          <span>HIGH</span>
-          <strong>{high}</strong>
-        </div>
+    {/* ----------------------------------------- */}
+    {/* SURGE ALERT */}
+    {/* ----------------------------------------- */}
 
-        <div className="stat medium">
-          <span>MEDIUM</span>
-          <strong>{medium}</strong>
-        </div>
+    {isSurge && (
+      <div className="surge-alert">
+        <div className="surge-alert-icon">!</div>
 
-        <div className="stat low">
-          <span>LOW</span>
-          <strong>{low}</strong>
-        </div>
+        <div>
+          <strong>
+            Emergency department surge detected
+          </strong>
 
-        <div className="stat pending">
-          <span>PENDING REVIEW</span>
-          <strong>{pending}</strong>
+          <p>
+            Patient volume is approximately 3× normal.
+            Queue prioritization is active and high-risk
+            patients remain ahead of lower-risk cases.
+          </p>
         </div>
       </div>
+    )}
 
-      <div className="card">
-        <div className="queue-header">
-          <div>
-            <h2>Priority queue</h2>
+    {/* ----------------------------------------- */}
+    {/* QUEUE STATISTICS */}
+    {/* ----------------------------------------- */}
 
-            <p>
-              Highest-risk patients appear first. Pending cases require nurse
-              review.
-            </p>
+    <div className="stats">
+      <div className="stat critical">
+        <span>CRITICAL</span>
+        <strong>{critical}</strong>
+      </div>
+
+      <div className="stat high">
+        <span>HIGH</span>
+        <strong>{high}</strong>
+      </div>
+
+      <div className="stat medium">
+        <span>MEDIUM</span>
+        <strong>{medium}</strong>
+      </div>
+
+      <div className="stat low">
+        <span>LOW</span>
+        <strong>{low}</strong>
+      </div>
+
+      <div className="stat pending">
+        <span>PENDING REVIEW</span>
+        <strong>{pending}</strong>
+      </div>
+    </div>
+
+    {/* ----------------------------------------- */}
+    {/* SAFETY MONITORING */}
+    {/* ----------------------------------------- */}
+
+    <div className="queue-safety-summary">
+      <div>
+        <span>HIGH UNCERTAINTY</span>
+        <strong>{highUncertainty}</strong>
+      </div>
+
+      <div>
+        <span>REASSESSMENT DUE</span>
+        <strong>{reassessmentDue}</strong>
+      </div>
+
+      <div>
+        <span>TOTAL WAITING</span>
+        <strong>{patients.length}</strong>
+      </div>
+    </div>
+
+    {/* ----------------------------------------- */}
+    {/* PRIORITY QUEUE */}
+    {/* ----------------------------------------- */}
+
+    <div className="card">
+      <div className="queue-header">
+        <div>
+          <p className="eyebrow">LIVE TRIAGE QUEUE</p>
+
+          <h2>Priority queue</h2>
+
+          <p>
+            Highest-risk patients appear first. Uncertain
+            and reassessment-due patients require additional
+            clinical attention.
+          </p>
+        </div>
+
+        <span className="patient-count">
+          {filteredPatients.length} patients
+        </span>
+      </div>
+
+      {/* ----------------------------------------- */}
+      {/* FILTERS */}
+      {/* ----------------------------------------- */}
+
+      <div className="queue-filters">
+        {[
+          "ALL",
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW",
+          "PENDING",
+          "UNCERTAIN",
+          "REASSESSMENT",
+        ].map((item) => (
+          <button
+            key={item}
+            className={`filter-button ${
+              filter === item ? "active" : ""
+            }`}
+            onClick={() => setFilter(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      {/* ----------------------------------------- */}
+      {/* TABLE */}
+      {/* ----------------------------------------- */}
+
+      {loading ? (
+        <div className="empty">
+          Loading patient queue...
+        </div>
+      ) : filteredPatients.length === 0 ? (
+        <div className="empty">
+          No patients match this filter.
+        </div>
+      ) : (
+        <div className="patient-table">
+
+          {/* TABLE HEADER */}
+
+          <div className="table-row table-head">
+            <span>Patient</span>
+            <span>Risk</span>
+            <span>Score</span>
+            <span>Confidence</span>
+            <span>Reassessment</span>
+            <span>Decision</span>
+            <span>Actions</span>
           </div>
 
-          <span className="patient-count">
-            {filteredPatients.length} patients
-          </span>
-        </div>
+          {/* PATIENT ROWS */}
 
-        <div className="queue-filters">
-          {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "PENDING"].map(
-            (item) => (
-              <button
-                key={item}
-                className={`filter-button ${filter === item ? "active" : ""}`}
-                onClick={() => setFilter(item)}
-              >
-                {item}
-              </button>
-            ),
-          )}
-        </div>
+          {filteredPatients.map((patient) => (
+            <div
+              className={`table-row ${
+                patient.decision === "PENDING"
+                  ? "pending-row"
+                  : ""
+              } ${
+                patient.queue_status === "REASSESSMENT_DUE"
+                  ? "reassessment-row"
+                  : ""
+              }`}
+              key={patient.patient_id}
+            >
 
-        {loading ? (
-          <div className="empty">Loading patient queue...</div>
-        ) : filteredPatients.length === 0 ? (
-          <div className="empty">No patients match this filter.</div>
-        ) : (
-          <div className="patient-table">
-            <div className="table-row table-head">
-              <span>Patient</span>
-              <span>Risk</span>
-              <span>Score</span>
-              <span>Reassessment</span>
-              <span>Decision</span>
-              <span></span>
-            </div>
+              {/* ----------------------------------------- */}
+              {/* PATIENT */}
+              {/* ----------------------------------------- */}
 
-            {filteredPatients.map((patient) => (
-              <div
-                className={`table-row ${
-                  patient.decision === "PENDING" ? "pending-row" : ""
-                }`}
-                key={patient.patient_id}
-              >
-                <span className="patient-id">{patient.patient_id}</span>
+              <span className="patient-id">
 
-                <span>
-                  <span
-                    className={`table-risk ${patient.risk_level.toLowerCase()}`}
-                  >
-                    {patient.risk_level}
-                  </span>
+                <span className="queue-position">
+                  #
+                  {String(
+                    patients.findIndex(
+                      (p) =>
+                        p.patient_id === patient.patient_id
+                    ) + 1
+                  ).padStart(2, "0")}
                 </span>
 
-                <span className="score-value">{patient.risk_score}</span>
-
-                <span>{patient.reassessment_minutes} min</span>
-
-                <span>
-                  <span
-                    className={`decision ${patient.decision.toLowerCase()}`}
-                  >
-                    {patient.decision === "PENDING"
-                      ? "⚠ PENDING REVIEW"
-                      : patient.decision}
-                  </span>
+                <span className="patient-id-text">
+                  {patient.patient_id}
                 </span>
+
+                {patient.is_demo && (
+                  <small className="demo-label">
+                    DEMO
+                  </small>
+                )}
+
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* RISK */}
+              {/* ----------------------------------------- */}
+
+              <span>
+                <span
+                  className={`table-risk ${
+                    patient.risk_level.toLowerCase()
+                  }`}
+                >
+                  {patient.risk_level}
+                </span>
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* SCORE */}
+              {/* ----------------------------------------- */}
+
+              <span className="score-value">
+                {patient.risk_score}
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* CONFIDENCE */}
+              {/* ----------------------------------------- */}
+
+              <span>
+                <span
+                  className={`confidence-mini ${
+                    patient.confidence
+                      ? patient.confidence.toLowerCase()
+                      : ""
+                  }`}
+                >
+                  {patient.confidence || "N/A"}
+                </span>
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* REASSESSMENT */}
+              {/* ----------------------------------------- */}
+
+              <span>
+                {(() => {
+                  const remaining =
+                    getRemainingSeconds(patient);
+
+                  if (
+                    patient.queue_status ===
+                      "REASSESSMENT_DUE" ||
+                    remaining === 0
+                  ) {
+                    return (
+                      <span className="reassessment-due">
+                        ⚠ DUE
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <span
+                      className={`queue-countdown ${
+                        remaining !== null &&
+                        remaining <= 60
+                          ? "urgent"
+                          : ""
+                      }`}
+                    >
+                      {formatQueueTime(remaining)}
+                    </span>
+                  );
+                })()}
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* DECISION */}
+              {/* ----------------------------------------- */}
+
+              <span>
+                <span
+                  className={`decision ${
+                    patient.decision
+                      ? patient.decision.toLowerCase()
+                      : ""
+                  }`}
+                >
+                  {patient.decision === "PENDING"
+                    ? "⚠ PENDING REVIEW"
+                    : patient.decision}
+                </span>
+              </span>
+
+              {/* ----------------------------------------- */}
+              {/* ACTIONS */}
+              {/* ----------------------------------------- */}
+
+              <div className="queue-actions">
 
                 <button
                   className="view-button"
-                  onClick={() => onSelectPatient(patient.patient_id)}
+                  onClick={() =>
+                    onSelectPatient(
+                      patient.patient_id
+                    )
+                  }
                 >
                   View
                 </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      <p className="disclaimer">
-        Prototype system using synthetic data. AI output is a recommendation
-        only and requires clinical review.
-      </p>
-    </section>
-  );
+                {(
+                  patient.queue_status ===
+                  "REASSESSMENT_DUE" ||
+                  getRemainingSeconds(patient) === 0
+                ) && (
+                  <button
+                    className="reassess-button"
+                    onClick={() =>
+                      handleReassess(
+                        patient.patient_id
+                      )
+                    }
+                  >
+                    Reassess
+                  </button>
+                )}
+
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    {/* ----------------------------------------- */}
+    {/* SAFETY NOTE */}
+    {/* ----------------------------------------- */}
+
+    <div className="nurse-warning">
+      <div className="warning-icon">!</div>
+
+      <div>
+        <strong>
+          Clinical oversight required
+        </strong>
+
+        <p>
+          AI recommendations are advisory. Nurses can
+          review, modify, or escalate every triage
+          recommendation.
+        </p>
+      </div>
+    </div>
+
+    <p className="disclaimer">
+      Prototype system using synthetic data. AI output is
+      a recommendation only and requires clinical review.
+    </p>
+  </section>
+);
+
 }
 
 export default App;
