@@ -14,6 +14,7 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
     conn = get_connection()
 
@@ -32,6 +33,10 @@ def init_db():
         )
     """)
 
+    # -----------------------------------------
+    # PATIENT TABLE MIGRATIONS
+    # -----------------------------------------
+
     columns = [
         row["name"]
         for row in conn.execute(
@@ -40,16 +45,25 @@ def init_db():
     ]
 
     migrations = {
-        "is_demo": "ALTER TABLE patients ADD COLUMN is_demo INTEGER DEFAULT 0",
-        "arrival_time": "ALTER TABLE patients ADD COLUMN arrival_time TEXT",
+        "is_demo": (
+            "ALTER TABLE patients "
+            "ADD COLUMN is_demo INTEGER DEFAULT 0"
+        ),
+        "arrival_time": (
+            "ALTER TABLE patients "
+            "ADD COLUMN arrival_time TEXT"
+        ),
         "reassessment_due_at": (
-            "ALTER TABLE patients ADD COLUMN reassessment_due_at TEXT"
+            "ALTER TABLE patients "
+            "ADD COLUMN reassessment_due_at TEXT"
         ),
         "queue_status": (
-            "ALTER TABLE patients ADD COLUMN queue_status TEXT DEFAULT 'WAITING'"
+            "ALTER TABLE patients "
+            "ADD COLUMN queue_status TEXT DEFAULT 'WAITING'"
         ),
         "last_reassessment": (
-            "ALTER TABLE patients ADD COLUMN last_reassessment TEXT"
+            "ALTER TABLE patients "
+            "ADD COLUMN last_reassessment TEXT"
         ),
     }
 
@@ -57,8 +71,26 @@ def init_db():
         if column not in columns:
             conn.execute(sql)
 
+    # -----------------------------------------
+    # DECISION AUDIT HISTORY
+    # -----------------------------------------
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS decision_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_id TEXT NOT NULL,
+            decision TEXT NOT NULL,
+            note TEXT DEFAULT '',
+            timestamp TEXT NOT NULL,
+            risk_level TEXT,
+            risk_score INTEGER,
+            risk_probability REAL
+        )
+    """)
+
     conn.commit()
     conn.close()
+
 
 def save_patient(
     patient_id,
@@ -153,7 +185,10 @@ def get_demo_patients():
 
     return patients
 
+
 def get_queue_patients():
+    from datetime import datetime, timezone
+
     conn = get_connection()
 
     rows = conn.execute(
@@ -163,12 +198,53 @@ def get_queue_patients():
         """
     ).fetchall()
 
-    conn.close()
-
     patients = []
+
+    now = datetime.now(timezone.utc)
 
     for row in rows:
         result = json.loads(row["result"])
+
+        queue_status = result.get(
+            "queue_status",
+            row["queue_status"] or "WAITING"
+        )
+
+        due_at = result.get(
+            "reassessment_due_at",
+            row["reassessment_due_at"]
+        )
+
+        # Automatically mark overdue patients.
+        if (
+            queue_status == "WAITING"
+            and due_at
+        ):
+            try:
+                due_time = datetime.fromisoformat(
+                    due_at
+                )
+
+                if due_time <= now:
+                    queue_status = "REASSESSMENT_DUE"
+
+                    result["queue_status"] = queue_status
+
+                    conn.execute(
+                        """
+                        UPDATE patients
+                        SET result = ?, queue_status = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            json.dumps(result),
+                            queue_status,
+                            row["id"]
+                        )
+                    )
+
+            except ValueError:
+                pass
 
         patients.append({
             "patient_id": row["id"],
@@ -178,9 +254,10 @@ def get_queue_patients():
             "is_demo": bool(row["is_demo"])
         })
 
+    conn.commit()
+    conn.close()
+
     return patients
-
-
 
 
 def clear_demo_patients():
@@ -239,3 +316,123 @@ def update_decision(patient_id, decision, note):
 
     conn.commit()
     conn.close()
+
+
+def update_reassessment(
+    patient_id,
+    last_reassessment,
+    reassessment_due_at,
+    queue_status
+):
+    conn = get_connection()
+
+    row = conn.execute(
+        "SELECT result FROM patients WHERE id = ?",
+        (patient_id,)
+    ).fetchone()
+
+    if row is None:
+        conn.close()
+        return False
+
+    result = json.loads(row["result"])
+
+    result["last_reassessment"] = last_reassessment
+    result["reassessment_due_at"] = reassessment_due_at
+    result["queue_status"] = queue_status
+
+    conn.execute(
+        """
+        UPDATE patients
+        SET result = ?,
+            last_reassessment = ?,
+            reassessment_due_at = ?,
+            queue_status = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(result),
+            last_reassessment,
+            reassessment_due_at,
+            queue_status,
+            patient_id
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return True
+
+
+# -----------------------------------------
+# DECISION AUDIT HISTORY
+# -----------------------------------------
+
+def save_decision_history(
+    patient_id,
+    decision,
+    note,
+    timestamp,
+    risk_level,
+    risk_score,
+    risk_probability
+):
+    conn = get_connection()
+
+    conn.execute(
+        """
+        INSERT INTO decision_history
+        (
+            patient_id,
+            decision,
+            note,
+            timestamp,
+            risk_level,
+            risk_score,
+            risk_probability
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            patient_id,
+            decision,
+            note,
+            timestamp,
+            risk_level,
+            risk_score,
+            risk_probability
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_decision_history(patient_id):
+    conn = get_connection()
+
+    rows = conn.execute(
+        """
+        SELECT
+            id,
+            patient_id,
+            decision,
+            note,
+            timestamp,
+            risk_level,
+            risk_score,
+            risk_probability
+        FROM decision_history
+        WHERE patient_id = ?
+        ORDER BY id DESC
+        """,
+        (patient_id,)
+    ).fetchall()
+
+    conn.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
