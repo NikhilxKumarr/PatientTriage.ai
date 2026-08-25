@@ -582,7 +582,7 @@ textarea:focus {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -787,10 +787,9 @@ textarea:focus {
     width: 100%;
     flex-wrap: wrap;
   }
-
-  .stats {
-    grid-template-columns: 1fr 1fr;
-  }
+.stats {
+  grid-template-columns: repeat(2, 1fr);
+}
 
   .patient-table {
     overflow-x: auto;
@@ -1080,4 +1079,52 @@ textarea:focus {
   .patient-vitals {
     grid-template-columns: 1fr;
   }
+}
+
+.stat.pending {
+  border-top: 3px solid #6b7280;
+}
+
+.stat.pending span {
+  color: #4b5563;
+}
+
+
+
+.pending-row {
+  background: #fffaf0;
+}
+
+.pending-row:hover {
+  background: #fff5df;
+}
+
+
+.queue-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.filter-button {
+  background: white;
+  border: 1px solid #d7dde6;
+  border-radius: 20px;
+  padding: 7px 13px;
+  color: #657286;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filter-button:hover {
+  border-color: #2774e6;
+  color: #2774e6;
+}
+
+.filter-button.active {
+  background: #edf5ff;
+  border-color: #bcd7fb;
+  color: #1c63c9;
 }
