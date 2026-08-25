@@ -1231,3 +1231,676 @@ textarea:focus {
   font-size: 11px;
   color: #5f552f;
 }
+
+
+/* =========================================================
+   SURGE QUEUE UI FIXES
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   Dashboard header
+   --------------------------------------------------------- */
+
+.dashboard-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.queue-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid #d8dee8;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
+.queue-mode.surge {
+  border-color: #fecaca;
+  background: #fff5f5;
+  color: #b91c1c;
+}
+
+.queue-mode.normal {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.queue-mode-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.queue-mode.surge .queue-mode-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 4px #fee2e2;
+}
+
+
+/* ---------------------------------------------------------
+   Refresh button
+   --------------------------------------------------------- */
+
+.refresh-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.refresh-button:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+
+/* ---------------------------------------------------------
+   Surge alert
+   --------------------------------------------------------- */
+
+.surge-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 20px 0 24px;
+  padding: 16px 18px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #ef4444;
+  border-radius: 12px;
+  background: #fff7f7;
+}
+
+.surge-alert-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: white;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.surge-alert strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #991b1b;
+  font-size: 15px;
+}
+
+.surge-alert p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* ---------------------------------------------------------
+   Main risk statistics
+   --------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  min-height: 104px;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-top-width: 3px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.stat span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.stat strong {
+  display: block;
+  color: #172033;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.stat.critical {
+  border-top-color: #ef4444;
+}
+
+.stat.critical span {
+  color: #dc2626;
+}
+
+.stat.high {
+  border-top-color: #f97316;
+}
+
+.stat.high span {
+  color: #c2410c;
+}
+
+.stat.medium {
+  border-top-color: #eab308;
+}
+
+.stat.medium span {
+  color: #a16207;
+}
+
+.stat.low {
+  border-top-color: #22c55e;
+}
+
+.stat.low span {
+  color: #15803d;
+}
+
+.stat.pending {
+  border-top-color: #64748b;
+}
+
+
+/* ---------------------------------------------------------
+   Safety summary
+   THIS fixes:
+   "HIGH UNCERTAINTY6"
+   "REASSESSMENT DUE0"
+   "TOTAL WAITING61"
+   --------------------------------------------------------- */
+
+.queue-safety-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+.queue-safety-summary > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.queue-safety-summary span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.queue-safety-summary strong {
+  color: #172033;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.queue-safety-summary > div:nth-child(1) {
+  border-left: 3px solid #f59e0b;
+}
+
+.queue-safety-summary > div:nth-child(2) {
+  border-left: 3px solid #ef4444;
+}
+
+.queue-safety-summary > div:nth-child(3) {
+  border-left: 3px solid #3b82f6;
+}
+
+
+/* ---------------------------------------------------------
+   Queue card
+   --------------------------------------------------------- */
+
+.queue-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.queue-header h2 {
+  margin: 3px 0 5px;
+}
+
+.queue-header p {
+  margin: 0;
+  color: #718096;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.patient-count {
+  flex-shrink: 0;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+/* ---------------------------------------------------------
+   Filters
+   --------------------------------------------------------- */
+
+.queue-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.filter-button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid #dbe2ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.filter-button:hover {
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+.filter-button.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+
+/* ---------------------------------------------------------
+   PATIENT TABLE
+   IMPORTANT:
+   JSX has 7 columns.
+   --------------------------------------------------------- */
+
+.patient-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.patient-table .table-row {
+  display: grid;
+  grid-template-columns:
+    minmax(175px, 1.6fr)
+    minmax(85px, 0.75fr)
+    minmax(60px, 0.55fr)
+    minmax(90px, 0.85fr)
+    minmax(105px, 1fr)
+    minmax(125px, 1.15fr)
+    82px;
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  min-height: 62px;
+  box-sizing: border-box;
+}
+
+.patient-table .table-head {
+  min-height: 42px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.patient-table .table-row:not(.table-head) {
+  padding: 0 12px;
+  border-bottom: 1px solid #edf1f5;
+  background: #ffffff;
+}
+
+.patient-table .table-row:not(.table-head):hover {
+  background: #f8fafc;
+}
+
+
+/* ---------------------------------------------------------
+   Pending rows
+   --------------------------------------------------------- */
+
+.patient-table .pending-row {
+  background: #fffaf0 !important;
+}
+
+.patient-table .pending-row:hover {
+  background: #fff7e6 !important;
+}
+
+.patient-table .reassessment-row {
+  background: #fff7f7 !important;
+}
+
+
+/* ---------------------------------------------------------
+   Patient ID + DEMO label
+   --------------------------------------------------------- */
+
+.patient-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.demo-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #eef2ff;
+  color: #6366f1;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+
+/* ---------------------------------------------------------
+   Risk badge
+   --------------------------------------------------------- */
+
+.table-risk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 62px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.table-risk.critical {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.table-risk.high {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.table-risk.medium {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.table-risk.low {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+
+/* ---------------------------------------------------------
+   Score
+   --------------------------------------------------------- */
+
+.score-value {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+
+/* ---------------------------------------------------------
+   Confidence
+   --------------------------------------------------------- */
+
+.confidence-mini {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.confidence-mini.high {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.confidence-mini.medium {
+  background: #fffbeb;
+  color: #a16207;
+}
+
+.confidence-mini.low {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+
+/* ---------------------------------------------------------
+   Decision
+   --------------------------------------------------------- */
+
+.decision {
+  display: inline-flex;
+  align-items: center;
+  max-width: 120px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.decision.accept {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.decision.modify {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.decision.escalate {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+
+/* ---------------------------------------------------------
+   Reassessment
+   --------------------------------------------------------- */
+
+.reassessment-due {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+
+/* ---------------------------------------------------------
+   View button
+   THIS fixes the button falling under Patient.
+   --------------------------------------------------------- */
+
+.view-button {
+  width: 82px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.18s ease;
+}
+
+.view-button:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+
+/* ---------------------------------------------------------
+   Empty state
+   --------------------------------------------------------- */
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+
+/* ---------------------------------------------------------
+   Nurse warning
+   --------------------------------------------------------- */
+
+.nurse-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+}
+
+.warning-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nurse-warning strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #1e40af;
+  font-size: 13px;
+}
+
+.nurse-warning p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* ---------------------------------------------------------
+   Responsive
+   --------------------------------------------------------- */
+
+@media (max-width: 1000px) {
+  .stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .queue-safety-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .patient-table .table-row {
+    min-width: 850px;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-heading {
+    flex-direction: column;
+  }
+
+  .dashboard-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .queue-header {
+    flex-direction: column;
+  }
+}
