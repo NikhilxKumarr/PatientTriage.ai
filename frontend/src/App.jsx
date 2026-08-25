@@ -494,49 +494,99 @@ function App() {
             </div>
 
             <div className="score-card">
-              <div className="score">
-                {result.risk_score}
-                <span>/100</span>
+              <div className="score-section">
+                <div className="score">
+                  {result.risk_score}
+                  <span>/100</span>
+                </div>
+
+                <div className="score-label">AI TRIAGE RISK SCORE</div>
               </div>
 
-              <div className="probability">
-                Model probability{" "}
+              <div className="probability-section">
+                <span>MODEL PROBABILITY</span>
+
                 <strong>{(result.risk_probability * 100).toFixed(1)}%</strong>
+
+                <div className="probability-bar">
+                  <div
+                    style={{
+                      width: `${result.risk_probability * 100}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="card">
-              <h2>Why was this patient flagged?</h2>
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">EXPLAINABLE AI</p>
+                  <h2>Why was this patient flagged?</h2>
+                </div>
 
-              <div className="factor-list">
-                {result.key_factors.map((factor, index) => (
-                  <div className="factor" key={index}>
-                    <div>
-                      <strong>{factor.factor}</strong>
-                    </div>
-
-                    <span className={`impact ${factor.impact.toLowerCase()}`}>
-                      {factor.impact}
-                    </span>
-                  </div>
-                ))}
+                <span className="factor-count">
+                  {result.key_factors.length} factors
+                </span>
               </div>
+
+              {result.key_factors.length > 0 ? (
+                <div className="factor-list">
+                  {result.key_factors.map((factor, index) => (
+                    <div className="factor" key={index}>
+                      <div className="factor-main">
+                        <div
+                          className={`factor-indicator ${factor.impact.toLowerCase()}`}
+                        />
+
+                        <strong>{factor.factor}</strong>
+                      </div>
+
+                      <span className={`impact ${factor.impact.toLowerCase()}`}>
+                        {factor.impact} IMPACT
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-factors">
+                  No major contributing factors identified.
+                </div>
+              )}
             </div>
 
             <div className="recommendation">
-              <div>
+              <div className="recommendation-main">
                 <p className="eyebrow">RECOMMENDED ACTION</p>
+
                 <h2>{result.recommended_action}</h2>
+
+                <p>
+                  AI recommendation based on the patient's presenting symptoms,
+                  vital signs and medical history.
+                </p>
               </div>
 
               <div className="reassessment">
                 <span>REASSESSMENT</span>
-                <strong>{result.reassessment_minutes} min</strong>
+
+                <strong>{result.reassessment_minutes}:00</strong>
+
+                <small>minutes</small>
               </div>
             </div>
 
             <div className="nurse-warning">
-              ⚠ AI recommendation — nurse confirmation required
+              <div className="warning-icon">!</div>
+
+              <div>
+                <strong>Nurse confirmation required</strong>
+
+                <p>
+                  AI provides a recommendation. Final clinical prioritization
+                  remains with the nurse.
+                </p>
+              </div>
             </div>
 
             <div className="actions">
@@ -589,55 +639,34 @@ function App() {
   );
 }
 
-function Dashboard({
-  patients,
-  loading,
-  onRefresh,
-  onSelectPatient,
-}) {
-  const critical = patients.filter(
-    (p) => p.risk_level === "CRITICAL"
-  ).length;
+function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
+  const critical = patients.filter((p) => p.risk_level === "CRITICAL").length;
 
-  const high = patients.filter(
-    (p) => p.risk_level === "HIGH"
-  ).length;
+  const high = patients.filter((p) => p.risk_level === "HIGH").length;
 
-  const medium = patients.filter(
-    (p) => p.risk_level === "MEDIUM"
-  ).length;
+  const medium = patients.filter((p) => p.risk_level === "MEDIUM").length;
 
-  const low = patients.filter(
-    (p) => p.risk_level === "LOW"
-  ).length;
+  const low = patients.filter((p) => p.risk_level === "LOW").length;
 
   return (
     <section>
-
       <div className="dashboard-heading">
-
         <div>
           <p className="eyebrow">NURSE WORKSPACE</p>
 
           <h1>Patient priority queue</h1>
 
           <p>
-            AI-assisted prioritization with nurse-controlled
-            clinical decisions.
+            AI-assisted prioritization with nurse-controlled clinical decisions.
           </p>
         </div>
 
-        <button
-          className="refresh-button"
-          onClick={onRefresh}
-        >
+        <button className="refresh-button" onClick={onRefresh}>
           ↻ Refresh
         </button>
-
       </div>
 
       <div className="stats">
-
         <div className="stat critical">
           <span>CRITICAL</span>
           <strong>{critical}</strong>
@@ -657,43 +686,25 @@ function Dashboard({
           <span>LOW</span>
           <strong>{low}</strong>
         </div>
-
       </div>
 
       <div className="card">
-
         <div className="queue-header">
-
           <div>
             <h2>Priority queue</h2>
 
-            <p>
-              Patients are ordered by AI-assessed risk.
-            </p>
+            <p>Patients are ordered by AI-assessed risk.</p>
           </div>
 
-          <span className="patient-count">
-            {patients.length} patients
-          </span>
-
+          <span className="patient-count">{patients.length} patients</span>
         </div>
 
         {loading ? (
-
-          <div className="empty">
-            Loading patient queue...
-          </div>
-
+          <div className="empty">Loading patient queue...</div>
         ) : patients.length === 0 ? (
-
-          <div className="empty">
-            No patients in the queue.
-          </div>
-
+          <div className="empty">No patients in the queue.</div>
         ) : (
-
           <div className="patient-table">
-
             <div className="table-row table-head">
               <span>Patient</span>
               <span>Risk</span>
@@ -704,15 +715,8 @@ function Dashboard({
             </div>
 
             {patients.map((patient) => (
-
-              <div
-                className="table-row"
-                key={patient.patient_id}
-              >
-
-                <span className="patient-id">
-                  {patient.patient_id}
-                </span>
+              <div className="table-row" key={patient.patient_id}>
+                <span className="patient-id">{patient.patient_id}</span>
 
                 <span>
                   <span
@@ -722,13 +726,9 @@ function Dashboard({
                   </span>
                 </span>
 
-                <span className="score-value">
-                  {patient.risk_score}
-                </span>
+                <span className="score-value">{patient.risk_score}</span>
 
-                <span>
-                  {patient.reassessment_minutes} min
-                </span>
+                <span>{patient.reassessment_minutes} min</span>
 
                 <span>
                   <span
@@ -744,22 +744,16 @@ function Dashboard({
                 >
                   View
                 </button>
-
               </div>
-
             ))}
-
           </div>
-
         )}
-
       </div>
 
       <p className="disclaimer">
-        Prototype system using synthetic data. AI output is a
-        recommendation only and requires clinical review.
+        Prototype system using synthetic data. AI output is a recommendation
+        only and requires clinical review.
       </p>
-
     </section>
   );
 }
