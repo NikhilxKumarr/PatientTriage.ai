@@ -4,10 +4,13 @@ from uuid import uuid4
 
 from schemas import PatientInput, NurseDecision
 from model import predict_risk
+from demo import SIMULATED_PATIENTS
 from database import (
     init_db,
     save_patient,
     get_patients,
+    get_demo_patients,
+    clear_demo_patients,
     get_patient,
     update_decision
 )
@@ -74,10 +77,7 @@ def assess_uncertainty(
         "unknown"
     ]
 
-    if any(
-        term in complaint
-        for term in ambiguous_terms
-    ):
+    if any(term in complaint for term in ambiguous_terms):
         safety_flags.append(
             "Ambiguous presenting complaint"
         )
@@ -104,13 +104,9 @@ def assess_age_specific_safety(
 
     safety_flags = []
     reasons = []
-
     risk_adjustment = "NONE"
 
-    # -----------------------------------------
-    # PEDIATRIC SAFETY CHECKS
-    # -----------------------------------------
-
+    # Pediatric safety checks
     if age_group == "PEDIATRIC":
 
         if (
@@ -179,10 +175,7 @@ def assess_age_specific_safety(
                 "Shortness of breath reported"
             )
 
-    # -----------------------------------------
-    # GERIATRIC SAFETY CHECKS
-    # -----------------------------------------
-
+    # Geriatric safety checks
     elif age_group == "GERIATRIC":
 
         if patient.confusion:
@@ -246,32 +239,10 @@ def assess_age_specific_safety(
     }
 
 
-# Allow React frontend to communicate with FastAPI.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
-
-
-@app.get("/")
-def root():
-    return {
-        "message": "PatientTriage.ai API is running",
-        "status": "online"
-    }
-
-
-@app.post("/intake")
-def intake(patient: PatientInput):
-
+def process_patient(
+    patient: PatientInput,
+    is_demo: bool = False
+) -> dict:
     patient_data = patient.model_dump()
 
     # -----------------------------------------
@@ -295,7 +266,7 @@ def intake(patient: PatientInput):
         "systolic_bp",
         "temperature",
         "respiratory_rate",
-        "pain_level",
+        "pain_level"
     ]
 
     missing_fields = [
@@ -510,11 +481,51 @@ def intake(patient: PatientInput):
     save_patient(
         result["patient_id"],
         patient_data,
-        result
+        result,
+        is_demo=is_demo
     )
 
     return result
 
+
+# -----------------------------------------
+# FASTAPI CONFIGURATION
+# -----------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "PatientTriage.ai API is running",
+        "status": "online"
+    }
+
+
+# -----------------------------------------
+# NORMAL PATIENT INTAKE
+# -----------------------------------------
+
+@app.post("/intake")
+def intake(patient: PatientInput):
+    return process_patient(patient)
+
+
+# -----------------------------------------
+# PATIENT QUEUE
+# -----------------------------------------
 
 @app.get("/patients")
 def patients():
@@ -534,6 +545,10 @@ def patient_details(patient_id: str):
 
     return patient
 
+
+# -----------------------------------------
+# NURSE DECISION
+# -----------------------------------------
 
 @app.post("/patients/{patient_id}/decision")
 def nurse_decision(
@@ -573,3 +588,90 @@ def nurse_decision(
         "note": decision.note,
         "status": "recorded"
     }
+
+
+# -----------------------------------------
+# ROUND 2 DEMO
+# -----------------------------------------
+
+@app.post("/demo/seed")
+def seed_demo_patients():
+
+    # Remove previous simulated patients so every demo
+    # run starts with exactly the same dataset.
+    deleted = clear_demo_patients()
+
+    created = []
+
+    for patient_data in SIMULATED_PATIENTS:
+
+        patient = PatientInput(**patient_data)
+
+        result = process_patient(
+            patient,
+            is_demo=True
+        )
+
+        created.append(result)
+
+    return {
+        "status": "demo_seeded",
+        "previous_demo_patients_removed": deleted,
+        "patients_created": len(created),
+        "patients": created
+    }
+
+@app.get("/demo/summary")
+def demo_summary():
+
+    patients = get_demo_patients()
+
+    if not patients:
+        return {
+            "patients": 0,
+            "message": "No demo patients available"
+        }
+
+    summary = {
+        "patients": len(patients),
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "pending": 0,
+        "high_uncertainty": 0,
+        "age_groups": {
+            "PEDIATRIC": 0,
+            "ADULT": 0,
+            "GERIATRIC": 0
+        }
+    }
+
+    for patient in patients:
+
+        risk = patient.get("risk_level")
+
+        if risk == "CRITICAL":
+            summary["critical"] += 1
+
+        elif risk == "HIGH":
+            summary["high"] += 1
+
+        elif risk == "MEDIUM":
+            summary["medium"] += 1
+
+        elif risk == "LOW":
+            summary["low"] += 1
+
+        if patient.get("decision") == "PENDING":
+            summary["pending"] += 1
+
+        if patient.get("uncertainty") == "HIGH":
+            summary["high_uncertainty"] += 1
+
+        age_group = patient.get("age_group")
+
+        if age_group in summary["age_groups"]:
+            summary["age_groups"][age_group] += 1
+
+    return summary

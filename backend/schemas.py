@@ -38,6 +38,7 @@ class NurseDecision(BaseModel):
 
 class PatientResponse(BaseModel):
     patient_id: str
+
     risk_level: str
     risk_probability: float
     risk_score: int
@@ -45,5 +46,17 @@ class PatientResponse(BaseModel):
     recommended_action: str
     reassessment_minutes: int
 
+    age_group: str
+    history_available: bool
+    data_completeness: float
+    missing_fields: list
+
+    confidence: str
+    uncertainty: str
+    safety_flags: list
+
+    age_safety: dict
+
     key_factors: list
+
     nurse_confirmation_required: bool
