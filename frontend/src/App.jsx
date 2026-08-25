@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
 const API_URL = "http://127.0.0.1:8000";
@@ -37,6 +37,40 @@ function App() {
   const [page, setPage] = useState("intake");
   const [patients, setPatients] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
+
+  useEffect(() => {
+    if (remainingSeconds === null || remainingSeconds <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setRemainingSeconds((previous) => {
+        if (previous <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [remainingSeconds]);
+
+  function formatTime(seconds) {
+    if (seconds === null) {
+      return "--:--";
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(
+      2,
+      "0",
+    )}`;
+  }
 
   function updateField(field, value) {
     setForm((previous) => ({
@@ -75,6 +109,7 @@ function App() {
       const data = await response.json();
 
       setResult(data);
+      setRemainingSeconds(data.reassessment_minutes * 60);
     } catch (err) {
       setError(
         "Could not connect to PatientTriage.ai backend. Make sure FastAPI is running on port 8000.",
@@ -161,12 +196,68 @@ function App() {
     setDecision(null);
     loadPatients();
   }
+async function openPatient(patientId) {
+  setError("");
+
+  try {
+    const response = await fetch(
+      `${API_URL}/patients/${patientId}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Unable to load patient");
+    }
+
+    const data = await response.json();
+
+    // The detail endpoint returns:
+    // {
+    //   patient_id,
+    //   data,
+    //   result,
+    //   decision,
+    //   note
+    // }
+    //
+    // Normalize it into the same structure
+    // used by the intake endpoint.
+
+    const patientResult = {
+      ...data.result,
+      patient_id: data.patient_id,
+      patient_data: data.data,
+      decision: data.decision,
+      note: data.note,
+    };
+
+    setResult(patientResult);
+
+    setDecision(
+      data.decision && data.decision !== "PENDING"
+        ? data.decision
+        : null
+    );
+
+    // Existing patients are not given a fake
+    // live countdown.
+    setRemainingSeconds(null);
+
+    setPage("intake");
+
+  } catch (err) {
+    console.error(err);
+    setError("Could not load the selected patient.");
+  }
+}
+
+
 
   function openIntake() {
     setPage("intake");
     setResult(null);
     setDecision(null);
     setError("");
+    setRemainingSeconds(null);
   }
 
   return (
@@ -207,14 +298,11 @@ function App() {
       <main className="container">
         {page === "dashboard" ? (
           <Dashboard
-            patients={patients}
-            loading={dashboardLoading}
-            onRefresh={loadPatients}
-            onSelectPatient={(patient) => {
-              setResult(patient);
-              setPage("intake");
-            }}
-          />
+              patients={patients}
+              loading={dashboardLoading}
+              onRefresh={loadPatients}
+              onSelectPatient={openPatient}
+            />
         ) : !result ? (
           <form onSubmit={assessPatient}>
             <section className="hero">
@@ -494,49 +582,113 @@ function App() {
             </div>
 
             <div className="score-card">
-              <div className="score">
-                {result.risk_score}
-                <span>/100</span>
+              <div className="score-section">
+                <div className="score">
+                  {result.risk_score}
+                  <span>/100</span>
+                </div>
+
+                <div className="score-label">AI TRIAGE RISK SCORE</div>
               </div>
 
-              <div className="probability">
-                Model probability{" "}
+              <div className="probability-section">
+                <span>MODEL PROBABILITY</span>
+
                 <strong>{(result.risk_probability * 100).toFixed(1)}%</strong>
+
+                <div className="probability-bar">
+                  <div
+                    style={{
+                      width: `${result.risk_probability * 100}%`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="card">
-              <h2>Why was this patient flagged?</h2>
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">EXPLAINABLE AI</p>
+                  <h2>Why was this patient flagged?</h2>
+                </div>
 
-              <div className="factor-list">
-                {result.key_factors.map((factor, index) => (
-                  <div className="factor" key={index}>
-                    <div>
-                      <strong>{factor.factor}</strong>
-                    </div>
-
-                    <span className={`impact ${factor.impact.toLowerCase()}`}>
-                      {factor.impact}
-                    </span>
-                  </div>
-                ))}
+                <span className="factor-count">
+                  {result.key_factors.length} factors
+                </span>
               </div>
+
+              {result.key_factors.length > 0 ? (
+                <div className="factor-list">
+                  {result.key_factors.map((factor, index) => (
+                    <div className="factor" key={index}>
+                      <div className="factor-main">
+                        <div
+                          className={`factor-indicator ${factor.impact.toLowerCase()}`}
+                        />
+
+                        <strong>{factor.factor}</strong>
+                      </div>
+
+                      <span className={`impact ${factor.impact.toLowerCase()}`}>
+                        {factor.impact} IMPACT
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-factors">
+                  No major contributing factors identified.
+                </div>
+              )}
             </div>
 
             <div className="recommendation">
-              <div>
+              <div className="recommendation-main">
                 <p className="eyebrow">RECOMMENDED ACTION</p>
+
                 <h2>{result.recommended_action}</h2>
+
+                <p>
+                  AI recommendation based on the patient's presenting symptoms,
+                  vital signs and medical history.
+                </p>
               </div>
 
-              <div className="reassessment">
+              <div
+                className={`reassessment ${
+                  remainingSeconds !== null && remainingSeconds <= 60
+                    ? "urgent"
+                    : ""
+                }`}
+              >
                 <span>REASSESSMENT</span>
-                <strong>{result.reassessment_minutes} min</strong>
+
+              <strong>
+                  {remainingSeconds !== null
+                    ? formatTime(remainingSeconds)
+                    : `${result.reassessment_minutes} min`}
+                </strong>
+
+                <small>
+                  {remainingSeconds !== null
+                    ? "remaining"
+                    : "assigned interval"}
+                </small>
               </div>
             </div>
 
             <div className="nurse-warning">
-              ⚠ AI recommendation — nurse confirmation required
+              <div className="warning-icon">!</div>
+
+              <div>
+                <strong>Nurse confirmation required</strong>
+
+                <p>
+                  AI provides a recommendation. Final clinical prioritization
+                  remains with the nurse.
+                </p>
+              </div>
             </div>
 
             <div className="actions">
@@ -578,6 +730,7 @@ function App() {
                 setResult(null);
                 setDecision(null);
                 setError("");
+                setRemainingSeconds(null);
               }}
             >
               ← Assess another patient
@@ -589,55 +742,34 @@ function App() {
   );
 }
 
-function Dashboard({
-  patients,
-  loading,
-  onRefresh,
-  onSelectPatient,
-}) {
-  const critical = patients.filter(
-    (p) => p.risk_level === "CRITICAL"
-  ).length;
+function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
+  const critical = patients.filter((p) => p.risk_level === "CRITICAL").length;
 
-  const high = patients.filter(
-    (p) => p.risk_level === "HIGH"
-  ).length;
+  const high = patients.filter((p) => p.risk_level === "HIGH").length;
 
-  const medium = patients.filter(
-    (p) => p.risk_level === "MEDIUM"
-  ).length;
+  const medium = patients.filter((p) => p.risk_level === "MEDIUM").length;
 
-  const low = patients.filter(
-    (p) => p.risk_level === "LOW"
-  ).length;
+  const low = patients.filter((p) => p.risk_level === "LOW").length;
 
   return (
     <section>
-
       <div className="dashboard-heading">
-
         <div>
           <p className="eyebrow">NURSE WORKSPACE</p>
 
           <h1>Patient priority queue</h1>
 
           <p>
-            AI-assisted prioritization with nurse-controlled
-            clinical decisions.
+            AI-assisted prioritization with nurse-controlled clinical decisions.
           </p>
         </div>
 
-        <button
-          className="refresh-button"
-          onClick={onRefresh}
-        >
+        <button className="refresh-button" onClick={onRefresh}>
           ↻ Refresh
         </button>
-
       </div>
 
       <div className="stats">
-
         <div className="stat critical">
           <span>CRITICAL</span>
           <strong>{critical}</strong>
@@ -657,43 +789,25 @@ function Dashboard({
           <span>LOW</span>
           <strong>{low}</strong>
         </div>
-
       </div>
 
       <div className="card">
-
         <div className="queue-header">
-
           <div>
             <h2>Priority queue</h2>
 
-            <p>
-              Patients are ordered by AI-assessed risk.
-            </p>
+            <p>Patients are ordered by AI-assessed risk.</p>
           </div>
 
-          <span className="patient-count">
-            {patients.length} patients
-          </span>
-
+          <span className="patient-count">{patients.length} patients</span>
         </div>
 
         {loading ? (
-
-          <div className="empty">
-            Loading patient queue...
-          </div>
-
+          <div className="empty">Loading patient queue...</div>
         ) : patients.length === 0 ? (
-
-          <div className="empty">
-            No patients in the queue.
-          </div>
-
+          <div className="empty">No patients in the queue.</div>
         ) : (
-
           <div className="patient-table">
-
             <div className="table-row table-head">
               <span>Patient</span>
               <span>Risk</span>
@@ -704,15 +818,8 @@ function Dashboard({
             </div>
 
             {patients.map((patient) => (
-
-              <div
-                className="table-row"
-                key={patient.patient_id}
-              >
-
-                <span className="patient-id">
-                  {patient.patient_id}
-                </span>
+              <div className="table-row" key={patient.patient_id}>
+                <span className="patient-id">{patient.patient_id}</span>
 
                 <span>
                   <span
@@ -722,13 +829,9 @@ function Dashboard({
                   </span>
                 </span>
 
-                <span className="score-value">
-                  {patient.risk_score}
-                </span>
+                <span className="score-value">{patient.risk_score}</span>
 
-                <span>
-                  {patient.reassessment_minutes} min
-                </span>
+                <span>{patient.reassessment_minutes} min</span>
 
                 <span>
                   <span
@@ -739,27 +842,21 @@ function Dashboard({
                 </span>
 
                 <button
-                  className="view-button"
-                  onClick={() => onSelectPatient(patient)}
-                >
-                  View
+                    className="view-button"
+                    onClick={() => onSelectPatient(patient.patient_id)}
+                  >
+                    View
                 </button>
-
               </div>
-
             ))}
-
           </div>
-
         )}
-
       </div>
 
       <p className="disclaimer">
-        Prototype system using synthetic data. AI output is a
-        recommendation only and requires clinical review.
+        Prototype system using synthetic data. AI output is a recommendation
+        only and requires clinical review.
       </p>
-
     </section>
   );
 }
