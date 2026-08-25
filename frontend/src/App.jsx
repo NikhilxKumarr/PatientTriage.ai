@@ -860,6 +860,7 @@ function App() {
 }
 
 function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
+  const [filter, setFilter] = useState("ALL");
   const critical = patients.filter((p) => p.risk_level === "CRITICAL").length;
 
   const high = patients.filter((p) => p.risk_level === "HIGH").length;
@@ -867,6 +868,21 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
   const medium = patients.filter((p) => p.risk_level === "MEDIUM").length;
 
   const low = patients.filter((p) => p.risk_level === "LOW").length;
+
+  const pending = patients.filter(
+  (p) => p.decision === "PENDING"
+    ).length;
+
+
+    const filteredPatients = patients.filter((patient) => {
+  if (filter === "ALL") return true;
+
+  if (filter === "PENDING") {
+    return patient.decision === "PENDING";
+  }
+
+  return patient.risk_level === filter;
+});
 
   return (
     <section>
@@ -885,44 +901,66 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
           ↻ Refresh
         </button>
       </div>
+        <div className="stats">
+          <div className="stat critical">
+            <span>CRITICAL</span>
+            <strong>{critical}</strong>
+          </div>
 
-      <div className="stats">
-        <div className="stat critical">
-          <span>CRITICAL</span>
-          <strong>{critical}</strong>
-        </div>
+          <div className="stat high">
+            <span>HIGH</span>
+            <strong>{high}</strong>
+          </div>
 
-        <div className="stat high">
-          <span>HIGH</span>
-          <strong>{high}</strong>
-        </div>
+          <div className="stat medium">
+            <span>MEDIUM</span>
+            <strong>{medium}</strong>
+          </div>
 
-        <div className="stat medium">
-          <span>MEDIUM</span>
-          <strong>{medium}</strong>
-        </div>
+          <div className="stat low">
+            <span>LOW</span>
+            <strong>{low}</strong>
+          </div>
 
-        <div className="stat low">
-          <span>LOW</span>
-          <strong>{low}</strong>
+          <div className="stat pending">
+            <span>PENDING REVIEW</span>
+            <strong>{pending}</strong>
+          </div>
         </div>
-      </div>
 
       <div className="card">
         <div className="queue-header">
           <div>
             <h2>Priority queue</h2>
 
-            <p>Patients are ordered by AI-assessed risk.</p>
+            <p>Highest-risk patients appear first. Pending cases require nurse review.</p>
           </div>
 
-          <span className="patient-count">{patients.length} patients</span>
+          <span className="patient-count">
+                {filteredPatients.length} patients
+              </span>
         </div>
+
+        <div className="queue-filters">
+            {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "PENDING"].map(
+              (item) => (
+                <button
+                  key={item}
+                  className={`filter-button ${
+                    filter === item ? "active" : ""
+                  }`}
+                  onClick={() => setFilter(item)}
+                >
+                  {item}
+                </button>
+              )
+            )}
+          </div>
 
         {loading ? (
           <div className="empty">Loading patient queue...</div>
-        ) : patients.length === 0 ? (
-          <div className="empty">No patients in the queue.</div>
+        ) : filteredPatients.length === 0 ? (
+          <div className="empty">No patients match this filter.</div>
         ) : (
           <div className="patient-table">
             <div className="table-row table-head">
@@ -934,8 +972,15 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
               <span></span>
             </div>
 
-            {patients.map((patient) => (
-              <div className="table-row" key={patient.patient_id}>
+           {filteredPatients.map((patient) => (
+             <div
+                  className={`table-row ${
+                    patient.decision === "PENDING"
+                      ? "pending-row"
+                      : ""
+                  }`}
+                  key={patient.patient_id}
+                >
                 <span className="patient-id">{patient.patient_id}</span>
 
                 <span>
@@ -952,9 +997,11 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
                 <span>
                   <span
-                    className={`decision ${patient.decision.toLowerCase()}`}
-                  >
-                    {patient.decision}
+                         className={`decision ${patient.decision.toLowerCase()}`}
+                >
+                    {patient.decision === "PENDING"
+                            ? "⚠ PENDING REVIEW"
+                            : patient.decision}
                   </span>
                 </span>
 
