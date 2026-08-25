@@ -578,30 +578,100 @@ function App() {
               </div>
             </div>
 
-            <div className="score-card">
-              <div className="score-section">
-                <div className="score">
-                  {result.risk_score}
-                  <span>/100</span>
-                </div>
 
-                <div className="score-label">AI TRIAGE RISK SCORE</div>
-              </div>
+        <div className="score-card">
+          {/* Score */}
+          <div className="score-section">
+            <div className="score">
+              {result.risk_score}
+              <span>/100</span>
+            </div>
 
-              <div className="probability-section">
-                <span>MODEL PROBABILITY</span>
+            <div className="score-label">AI TRIAGE RISK SCORE</div>
+          </div>
 
-                <strong>{(result.risk_probability * 100).toFixed(1)}%</strong>
+          {/* Probability */}
+          <div className="probability-section">
+            <span>MODEL PROBABILITY</span>
 
-                <div className="probability-bar">
-                  <div
-                    style={{
-                      width: `${result.risk_probability * 100}%`,
-                    }}
-                  />
-                </div>
+            <strong>
+              {(result.risk_probability * 100).toFixed(1)}%
+            </strong>
+
+            <div className="probability-bar">
+              <div
+                style={{
+                  width: `${result.risk_probability * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Confidence */}
+          {result.confidence && (
+            <div
+              className={`confidence-section ${result.confidence.toLowerCase()}`}
+            >
+              <span>MODEL CONFIDENCE</span>
+
+              <strong>{result.confidence}</strong>
+
+              <small>
+                {result.uncertainty === "HIGH"
+                  ? "High uncertainty — clinical review required"
+                  : result.uncertainty === "MEDIUM"
+                  ? "Moderate uncertainty — review recommended"
+                  : "Low uncertainty"}
+              </small>
+            </div>
+          )}
+        </div>
+
+        {/* Safety panel OUTSIDE score-card */}
+        {(result.safety_flags?.length > 0 ||
+          result.age_safety?.risk_adjustment === "REVIEW_REQUIRED") && (
+          <div className="safety-panel">
+            <div className="safety-panel-heading">
+              <div className="safety-icon">!</div>
+
+              <div>
+                <p className="eyebrow">SAFETY REVIEW</p>
+                <h3>Additional clinical review recommended</h3>
               </div>
             </div>
+
+            {result.age_safety?.reasons?.length > 0 && (
+              <div className="safety-block">
+                <span className="safety-label">
+                  {result.age_group} SAFETY CONSIDERATIONS
+                </span>
+
+                <ul>
+                  {result.age_safety.reasons.map((reason, index) => (
+                    <li key={index}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {result.safety_flags?.length > 0 && (
+              <div className="safety-block">
+                <span className="safety-label">SAFETY FLAGS</span>
+
+                <ul>
+                  {result.safety_flags.map((flag, index) => (
+                    <li key={index}>{flag}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+
+
+
+
 
             {result.patient_data && (
               <div className="card patient-detail-card">

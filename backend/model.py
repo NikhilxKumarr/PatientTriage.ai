@@ -24,9 +24,22 @@ RISK_LEVELS = {
 
 def predict_risk(patient):
     data = {}
+    missing_features = []
 
     for feature in FEATURES:
-        data[feature] = patient.get(feature, 0)
+
+        value = patient.get(feature)
+
+        if value is None:
+            missing_features.append(feature)
+
+            # Keep the existing model compatible.
+            # The safety layer will separately account
+            # for the missing information.
+            data[feature] = 0
+
+        else:
+            data[feature] = value
 
     df = pd.DataFrame([data])
 
@@ -43,5 +56,6 @@ def predict_risk(patient):
     return {
         "risk_level": risk_level,
         "risk_probability": round(probability, 3),
-        "risk_score": risk_score
+        "risk_score": risk_score,
+        "missing_features": missing_features
     }

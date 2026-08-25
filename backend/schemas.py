@@ -4,25 +4,28 @@ from typing import Optional
 
 class PatientInput(BaseModel):
     age: int = Field(..., ge=0, le=120)
-    heart_rate: int = Field(..., ge=20, le=250)
-    spo2: int = Field(..., ge=50, le=100)
-    systolic_bp: int = Field(..., ge=50, le=250)
 
-    temperature: float = Field(..., ge=30, le=45)
-    respiratory_rate: int = Field(..., ge=5, le=60)
-    pain_level: int = Field(..., ge=0, le=10)
+    heart_rate: Optional[int] = Field(None, ge=20, le=250)
+    spo2: Optional[int] = Field(None, ge=50, le=100)
+    systolic_bp: Optional[int] = Field(None, ge=50, le=250)
 
-    chest_pain: int = 0
-    shortness_breath: int = 0
-    confusion: int = 0
-    weakness: int = 0
-    speech_problem: int = 0
-    severe_bleeding: int = 0
+    temperature: Optional[float] = Field(None, ge=30, le=45)
+    respiratory_rate: Optional[int] = Field(None, ge=5, le=60)
+    pain_level: Optional[int] = Field(None, ge=0, le=10)
 
-    cardiac_history: int = 0
-    diabetes: int = 0
-    hypertension: int = 0
-    previous_stroke: int = 0
+    chest_pain: Optional[int] = None
+    shortness_breath: Optional[int] = None
+    confusion: Optional[int] = None
+    weakness: Optional[int] = None
+    speech_problem: Optional[int] = None
+    severe_bleeding: Optional[int] = None
+
+    cardiac_history: Optional[int] = None
+    diabetes: Optional[int] = None
+    hypertension: Optional[int] = None
+    previous_stroke: Optional[int] = None
+
+    history_available: bool = False
 
     chief_complaint: Optional[str] = ""
     patient_words: Optional[str] = ""
@@ -35,6 +38,7 @@ class NurseDecision(BaseModel):
 
 class PatientResponse(BaseModel):
     patient_id: str
+
     risk_level: str
     risk_probability: float
     risk_score: int
@@ -42,5 +46,17 @@ class PatientResponse(BaseModel):
     recommended_action: str
     reassessment_minutes: int
 
+    age_group: str
+    history_available: bool
+    data_completeness: float
+    missing_fields: list
+
+    confidence: str
+    uncertainty: str
+    safety_flags: list
+
+    age_safety: dict
+
     key_factors: list
+
     nurse_confirmation_required: bool

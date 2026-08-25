@@ -24,27 +24,47 @@ def init_db():
             data TEXT NOT NULL,
             result TEXT NOT NULL,
             decision TEXT DEFAULT 'PENDING',
-            note TEXT DEFAULT ''
+            note TEXT DEFAULT '',
+            is_demo INTEGER DEFAULT 0
         )
     """)
+
+    # Support databases created before is_demo existed.
+    columns = [
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(patients)"
+        ).fetchall()
+    ]
+
+    if "is_demo" not in columns:
+        conn.execute(
+            "ALTER TABLE patients ADD COLUMN is_demo INTEGER DEFAULT 0"
+        )
 
     conn.commit()
     conn.close()
 
 
-def save_patient(patient_id, data, result):
+def save_patient(
+    patient_id,
+    data,
+    result,
+    is_demo=False
+):
     conn = get_connection()
 
     conn.execute(
         """
         INSERT INTO patients
-        (id, data, result)
-        VALUES (?, ?, ?)
+        (id, data, result, is_demo)
+        VALUES (?, ?, ?, ?)
         """,
         (
             patient_id,
             json.dumps(data),
-            json.dumps(result)
+            json.dumps(result),
+            1 if is_demo else 0
         )
     )
 
@@ -56,7 +76,7 @@ def get_patients():
     conn = get_connection()
 
     rows = conn.execute(
-        "SELECT * FROM patients"
+        "SELECT * FROM patients ORDER BY rowid DESC"
     ).fetchall()
 
     conn.close()
@@ -70,10 +90,55 @@ def get_patients():
             "patient_id": row["id"],
             **result,
             "decision": row["decision"],
-            "note": row["note"]
+            "note": row["note"],
+            "is_demo": bool(row["is_demo"])
         })
 
     return patients
+
+
+def get_demo_patients():
+    conn = get_connection()
+
+    rows = conn.execute(
+        """
+        SELECT * FROM patients
+        WHERE is_demo = 1
+        ORDER BY rowid DESC
+        """
+    ).fetchall()
+
+    conn.close()
+
+    patients = []
+
+    for row in rows:
+        result = json.loads(row["result"])
+
+        patients.append({
+            "patient_id": row["id"],
+            **result,
+            "decision": row["decision"],
+            "note": row["note"],
+            "is_demo": True
+        })
+
+    return patients
+
+
+def clear_demo_patients():
+    conn = get_connection()
+
+    cursor = conn.execute(
+        "DELETE FROM patients WHERE is_demo = 1"
+    )
+
+    deleted = cursor.rowcount
+
+    conn.commit()
+    conn.close()
+
+    return deleted
 
 
 def get_patient(patient_id):
@@ -94,7 +159,8 @@ def get_patient(patient_id):
         "data": json.loads(row["data"]),
         "result": json.loads(row["result"]),
         "decision": row["decision"],
-        "note": row["note"]
+        "note": row["note"],
+        "is_demo": bool(row["is_demo"])
     }
 
 
@@ -107,7 +173,11 @@ def update_decision(patient_id, decision, note):
         SET decision = ?, note = ?
         WHERE id = ?
         """,
-        (decision, note, patient_id)
+        (
+            decision,
+            note,
+            patient_id
+        )
     )
 
     conn.commit()
