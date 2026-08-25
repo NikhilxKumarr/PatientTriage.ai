@@ -16,7 +16,9 @@ from database import (
     clear_demo_patients,
     get_patient,
     update_decision,
-    update_reassessment
+    update_reassessment,
+    save_decision_history,
+    get_decision_history
 )
 
 
@@ -609,19 +611,56 @@ def nurse_decision(
             detail="Decision must be ACCEPT, MODIFY, or ESCALATE"
         )
 
+    result = patient["result"]
+
+    timestamp = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    # Update the current/latest decision.
     update_decision(
         patient_id,
         decision.decision,
         decision.note
     )
 
+    # Preserve a permanent audit record.
+    save_decision_history(
+        patient_id,
+        decision.decision,
+        decision.note,
+        timestamp,
+        result.get("risk_level"),
+        result.get("risk_score"),
+        result.get("risk_probability")
+    )
+
     return {
         "patient_id": patient_id,
         "decision": decision.decision,
         "note": decision.note,
+        "timestamp": timestamp,
         "status": "recorded"
     }
 
+
+
+
+@app.get("/patients/{patient_id}/decision-history")
+def decision_history(patient_id: str):
+
+    patient = get_patient(patient_id)
+
+    if patient is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return {
+        "patient_id": patient_id,
+        "history": get_decision_history(patient_id)
+    }
 # -----------------------------------------
 # PATIENT REASSESSMENT
 # -----------------------------------------
@@ -692,7 +731,8 @@ def queue():
             "total_patients": 0
         }
 
-    # Include both active and reassessment-due patients.
+    # Only active patients belong in the nurse queue.
+    # Reassessment-due patients must remain visible.
     active = [
         patient
         for patient in patients
@@ -702,8 +742,10 @@ def queue():
         ]
     ]
 
-    # Priority order:
-    # CRITICAL > HIGH > MEDIUM > LOW
+    # -----------------------------------------
+    # RISK PRIORITY
+    # -----------------------------------------
+
     risk_priority = {
         "CRITICAL": 4,
         "HIGH": 3,
@@ -718,22 +760,21 @@ def queue():
             0
         )
 
-        # Reassessment-due patients get additional priority.
+        # Reassessment-due patients get priority.
         reassessment_due = (
             1
-           if patient.get("queue_status") in [
-            "WAITING",
-            "REASSESSMENT_DUE"
-        ]
+            if patient.get("queue_status") == "REASSESSMENT_DUE"
             else 0
         )
 
+        # High uncertainty gets additional priority.
         uncertainty = (
             1
             if patient.get("uncertainty") == "HIGH"
             else 0
         )
 
+        # Lower tuple values sort first.
         return (
             -reassessment_due,
             -risk,
@@ -741,19 +782,27 @@ def queue():
             patient.get("arrival_time", "")
         )
 
+    # -----------------------------------------
+    # SORT QUEUE
+    # -----------------------------------------
+
     active.sort(key=queue_priority)
 
+    # -----------------------------------------
+    # QUEUE STATUS
+    # -----------------------------------------
+
+    queue_status = (
+        "SURGE"
+        if len(active) >= 40
+        else "NORMAL"
+    )
+
     return {
-        "queue_status": (
-            "SURGE"
-            if len(active) >= 40
-            else "NORMAL"
-        ),
+        "queue_status": queue_status,
         "total_patients": len(active),
         "patients": active
     }
-
-
 
 # -----------------------------------------
 # ROUND 2 DEMO

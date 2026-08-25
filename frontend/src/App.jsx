@@ -34,6 +34,8 @@ function App() {
   const [error, setError] = useState("");
   const [decision, setDecision] = useState(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const [decisionHistory, setDecisionHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [page, setPage] = useState("intake");
   const [patients, setPatients] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
@@ -149,6 +151,15 @@ function App() {
       }
 
       const data = await response.json();
+      const historyResponse = await fetch(
+        `${API_URL}/patients/${result.patient_id}/decision-history`,
+      );
+
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+
+        setDecisionHistory(historyData.history || []);
+      }
 
       setDecision(data.decision);
     } catch (err) {
@@ -180,8 +191,10 @@ function App() {
     }
   }
 
-  async function handleReassess(patientId) {
+ async function handleReassess(patientId) {
   try {
+    setError("");
+
     const response = await fetch(
       `${API_URL}/patients/${patientId}/reassess`,
       {
@@ -193,11 +206,15 @@ function App() {
       throw new Error("Failed to reassess patient");
     }
 
+    const data = await response.json();
+
+    // Refresh the queue so the new reassessment time
+    // and WAITING status appear immediately.
     await loadPatients();
 
   } catch (error) {
     console.error("Reassessment failed:", error);
-    alert("Failed to reassess patient.");
+    setError("Failed to reassess patient.");
   }
 }
 
@@ -209,27 +226,25 @@ function App() {
   }
   async function openPatient(patientId) {
     setError("");
+    setHistoryLoading(true);
+    setDecisionHistory([]);
 
     try {
-      const response = await fetch(`${API_URL}/patients/${patientId}`);
+      const [patientResponse, historyResponse] = await Promise.all([
+        fetch(`${API_URL}/patients/${patientId}`),
+        fetch(`${API_URL}/patients/${patientId}/decision-history`),
+      ]);
 
-      if (!response.ok) {
+      if (!patientResponse.ok) {
         throw new Error("Unable to load patient");
       }
 
-      const data = await response.json();
+      if (!historyResponse.ok) {
+        throw new Error("Unable to load decision history");
+      }
 
-      // The detail endpoint returns:
-      // {
-      //   patient_id,
-      //   data,
-      //   result,
-      //   decision,
-      //   note
-      // }
-      //
-      // Normalize it into the same structure
-      // used by the intake endpoint.
+      const data = await patientResponse.json();
+      const historyData = await historyResponse.json();
 
       const patientResult = {
         ...data.result,
@@ -245,14 +260,18 @@ function App() {
         data.decision && data.decision !== "PENDING" ? data.decision : null,
       );
 
-      // Existing patients are not given a fake
-      // live countdown.
+      setDecisionHistory(historyData.history || []);
+
+      // Existing patients are not given a fake live countdown.
       setRemainingSeconds(null);
 
       setPage("intake");
     } catch (err) {
       console.error(err);
       setError("Could not load the selected patient.");
+      setDecisionHistory([]);
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -916,6 +935,100 @@ function App() {
               </div>
             )}
 
+
+            {/* ----------------------------------------- */}
+{/* DECISION AUDIT HISTORY */}
+{/* ----------------------------------------- */}
+
+<div className="decision-history">
+  <div className="decision-history-header">
+    <div>
+      <p className="eyebrow">CLINICAL AUDIT TRAIL</p>
+
+      <h3>Decision history</h3>
+
+      <p>
+        Previous nurse decisions recorded for this patient.
+      </p>
+    </div>
+
+    <span className="history-count">
+      {decisionHistory.length}{" "}
+      {decisionHistory.length === 1 ? "decision" : "decisions"}
+    </span>
+  </div>
+
+  {historyLoading ? (
+    <div className="history-empty">
+      Loading decision history...
+    </div>
+  ) : decisionHistory.length === 0 ? (
+    <div className="history-empty">
+      <strong>No previous decisions</strong>
+      <span>
+        No nurse decision has been recorded for this patient yet.
+      </span>
+    </div>
+  ) : (
+    <div className="history-list">
+      {decisionHistory.map((item) => (
+        <div
+          className="history-item"
+          key={item.id}
+        >
+          <div className="history-item-top">
+            <span
+              className={`history-decision ${
+                item.decision
+                  ? item.decision.toLowerCase()
+                  : ""
+              }`}
+            >
+              {item.decision}
+            </span>
+
+            <span className="history-time">
+              {item.timestamp
+                ? new Date(item.timestamp).toLocaleString()
+                : "Unknown time"}
+            </span>
+          </div>
+
+          <div className="history-risk">
+            <span>
+              AI Risk:
+              <strong>{item.risk_level}</strong>
+            </span>
+
+            <span>
+              Score:
+              <strong>{item.risk_score}</strong>
+            </span>
+
+            <span>
+              Probability:
+              <strong>
+                {item.risk_probability !== undefined
+                  ? `${Math.round(
+                      item.risk_probability * 100
+                    )}%`
+                  : "N/A"}
+              </strong>
+            </span>
+          </div>
+
+          {item.note && (
+            <div className="history-note">
+              <span>NOTE</span>
+              <p>{item.note}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
             <button
               className="new-patient"
               onClick={() => {
@@ -996,27 +1109,21 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
   const highRisk = critical + high;
 
-const highRiskPercent =
-  patients.length > 0
-    ? Math.round((highRisk / patients.length) * 100)
-    : 0;
+  const highRiskPercent =
+    patients.length > 0 ? Math.round((highRisk / patients.length) * 100) : 0;
 
-const pendingPercent =
-  patients.length > 0
-    ? Math.round((pending / patients.length) * 100)
-    : 0;
+  const pendingPercent =
+    patients.length > 0 ? Math.round((pending / patients.length) * 100) : 0;
 
-const reassessmentPercent =
-  patients.length > 0
-    ? Math.round((reassessmentDue / patients.length) * 100)
-    : 0;
+  const reassessmentPercent =
+    patients.length > 0
+      ? Math.round((reassessmentDue / patients.length) * 100)
+      : 0;
 
-const uncertaintyPercent =
-  patients.length > 0
-    ? Math.round((highUncertainty / patients.length) * 100)
-    : 0;
-
-
+  const uncertaintyPercent =
+    patients.length > 0
+      ? Math.round((highUncertainty / patients.length) * 100)
+      : 0;
 
   const filteredPatients = patients.filter((patient) => {
     if (filter === "ALL") {
@@ -1038,7 +1145,7 @@ const uncertaintyPercent =
     return patient.risk_level === filter;
   });
 
-  return (
+ return (
   <section>
     {/* ----------------------------------------- */}
     {/* DASHBOARD HEADER */}
@@ -1058,7 +1165,6 @@ const uncertaintyPercent =
       <div className="dashboard-actions">
         <div className={`queue-mode ${isSurge ? "surge" : "normal"}`}>
           <span className="queue-mode-dot"></span>
-
           {isSurge ? "SURGE MODE" : "NORMAL LOAD"}
         </div>
 
@@ -1080,14 +1186,11 @@ const uncertaintyPercent =
         <div className="surge-alert-icon">!</div>
 
         <div>
-          <strong>
-            Emergency department surge detected
-          </strong>
+          <strong>Emergency department surge detected</strong>
 
           <p>
-            Patient volume is approximately 3× normal.
-            Queue prioritization is active and high-risk
-            patients remain ahead of lower-risk cases.
+            Patient volume is approximately 3× normal. Queue prioritization is
+            active and high-risk patients remain ahead of lower-risk cases.
           </p>
         </div>
       </div>
@@ -1145,102 +1248,94 @@ const uncertaintyPercent =
       </div>
     </div>
 
+    {/* ----------------------------------------- */}
+    {/* QUEUE HEALTH */}
+    {/* ----------------------------------------- */}
 
+    <div className="queue-health">
+      <div className="queue-health-header">
+        <div>
+          <p className="eyebrow">OPERATIONAL OVERVIEW</p>
+          <h2>Queue health</h2>
+        </div>
 
+        <span
+          className={`health-status ${
+            isSurge ? "danger" : "stable"
+          }`}
+        >
+          {isSurge ? "HIGH LOAD" : "STABLE"}
+        </span>
+      </div>
 
-{/* ----------------------------------------- */}
-{/* QUEUE HEALTH */}
-{/* ----------------------------------------- */}
+      <div className="queue-health-grid">
+        <div className="health-metric">
+          <span>HIGH-RISK PATIENTS</span>
 
-<div className="queue-health">
+          <strong>{highRiskPercent}%</strong>
 
-  <div className="queue-health-header">
-    <div>
-      <p className="eyebrow">OPERATIONAL OVERVIEW</p>
-      <h2>Queue health</h2>
-    </div>
+          <small>
+            {highRisk} of {patients.length} patients
+          </small>
 
-    <span className={`health-status ${isSurge ? "danger" : "stable"}`}>
-      {isSurge ? "HIGH LOAD" : "STABLE"}
-    </span>
-  </div>
+          <div className="health-bar">
+            <div
+              style={{
+                width: `${highRiskPercent}%`,
+              }}
+            />
+          </div>
+        </div>
 
-  <div className="queue-health-grid">
+        <div className="health-metric">
+          <span>PENDING REVIEW</span>
 
-    <div className="health-metric">
-      <span>HIGH-RISK PATIENTS</span>
+          <strong>{pendingPercent}%</strong>
 
-      <strong>{highRiskPercent}%</strong>
+          <small>{pending} patients</small>
 
-      <small>
-        {highRisk} of {patients.length} patients
-      </small>
+          <div className="health-bar">
+            <div
+              style={{
+                width: `${pendingPercent}%`,
+              }}
+            />
+          </div>
+        </div>
 
-      <div className="health-bar">
-        <div
-          style={{
-            width: `${highRiskPercent}%`,
-          }}
-        />
+        <div className="health-metric">
+          <span>REASSESSMENT DUE</span>
+
+          <strong>{reassessmentPercent}%</strong>
+
+          <small>{reassessmentDue} patients</small>
+
+          <div className="health-bar">
+            <div
+              style={{
+                width: `${reassessmentPercent}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="health-metric">
+          <span>HIGH UNCERTAINTY</span>
+
+          <strong>{uncertaintyPercent}%</strong>
+
+          <small>{highUncertainty} patients</small>
+
+          <div className="health-bar">
+            <div
+              style={{
+                width: `${uncertaintyPercent}%`,
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
-
-    <div className="health-metric">
-      <span>PENDING REVIEW</span>
-
-      <strong>{pendingPercent}%</strong>
-
-      <small>
-        {pending} patients
-      </small>
-
-      <div className="health-bar">
-        <div
-          style={{
-            width: `${pendingPercent}%`,
-          }}
-        />
-      </div>
-    </div>
-
-    <div className="health-metric">
-      <span>REASSESSMENT DUE</span>
-
-      <strong>{reassessmentPercent}%</strong>
-
-      <small>
-        {reassessmentDue} patients
-      </small>
-
-      <div className="health-bar">
-        <div
-          style={{
-            width: `${reassessmentPercent}%`,
-          }}
-        />
-      </div>
-    </div>
-
-    <div className="health-metric">
-      <span>HIGH UNCERTAINTY</span>
-
-      <strong>{uncertaintyPercent}%</strong>
-
-      <small>
-        {highUncertainty} patients
-      </small>
-
-      <div className="health-bar">
-        <div
-          style={{
-            width: `${uncertaintyPercent}%`,
-          }}
-        />
-      </div>
-    </div>
-
-  </div>
-</div>
 
     {/* ----------------------------------------- */}
     {/* PRIORITY QUEUE */}
@@ -1254,9 +1349,8 @@ const uncertaintyPercent =
           <h2>Priority queue</h2>
 
           <p>
-            Highest-risk patients appear first. Uncertain
-            and reassessment-due patients require additional
-            clinical attention.
+            Highest-risk patients appear first. Uncertain and
+            reassessment-due patients require additional clinical attention.
           </p>
         </div>
 
@@ -1321,108 +1415,104 @@ const uncertaintyPercent =
 
           {/* PATIENT ROWS */}
 
-          {filteredPatients.map((patient) => (
-            <div
-              className={`table-row ${
-                patient.decision === "PENDING"
-                  ? "pending-row"
-                  : ""
-              } ${
-                patient.queue_status === "REASSESSMENT_DUE"
-                  ? "reassessment-row"
-                  : ""
-              }`}
-              key={patient.patient_id}
-            >
+          {filteredPatients.map((patient) => {
+            const remaining = getRemainingSeconds(patient);
 
-              {/* ----------------------------------------- */}
-              {/* PATIENT */}
-              {/* ----------------------------------------- */}
+            const reassessmentDue =
+              patient.queue_status === "REASSESSMENT_DUE" ||
+              remaining === 0;
 
-              <span className="patient-id">
+            return (
+              <div
+                className={`table-row ${
+                  patient.decision === "PENDING"
+                    ? "pending-row"
+                    : ""
+                } ${
+                  reassessmentDue
+                    ? "reassessment-row"
+                    : ""
+                }`}
+                key={patient.patient_id}
+              >
 
-                <span className="queue-position">
-                  #
-                  {String(
-                    patients.findIndex(
-                      (p) =>
-                        p.patient_id === patient.patient_id
-                    ) + 1
-                  ).padStart(2, "0")}
+                {/* ----------------------------------------- */}
+                {/* PATIENT */}
+                {/* ----------------------------------------- */}
+
+                <span className="patient-id">
+
+                  <span className="queue-position">
+                    #
+                    {String(
+                      patients.findIndex(
+                        (p) =>
+                          p.patient_id ===
+                          patient.patient_id
+                      ) + 1
+                    ).padStart(2, "0")}
+                  </span>
+
+                  <span className="patient-id-text">
+                    {patient.patient_id}
+                  </span>
+
+                  {patient.is_demo && (
+                    <small className="demo-label">
+                      DEMO
+                    </small>
+                  )}
+
                 </span>
 
-                <span className="patient-id-text">
-                  {patient.patient_id}
+                {/* ----------------------------------------- */}
+                {/* RISK */}
+                {/* ----------------------------------------- */}
+
+                <span>
+                  <span
+                    className={`table-risk ${
+                      patient.risk_level.toLowerCase()
+                    }`}
+                  >
+                    {patient.risk_level}
+                  </span>
                 </span>
 
-                {patient.is_demo && (
-                  <small className="demo-label">
-                    DEMO
-                  </small>
-                )}
+                {/* ----------------------------------------- */}
+                {/* SCORE */}
+                {/* ----------------------------------------- */}
 
-              </span>
-
-              {/* ----------------------------------------- */}
-              {/* RISK */}
-              {/* ----------------------------------------- */}
-
-              <span>
-                <span
-                  className={`table-risk ${
-                    patient.risk_level.toLowerCase()
-                  }`}
-                >
-                  {patient.risk_level}
+                <span className="score-value">
+                  {patient.risk_score}
                 </span>
-              </span>
 
-              {/* ----------------------------------------- */}
-              {/* SCORE */}
-              {/* ----------------------------------------- */}
+                {/* ----------------------------------------- */}
+                {/* CONFIDENCE */}
+                {/* ----------------------------------------- */}
 
-              <span className="score-value">
-                {patient.risk_score}
-              </span>
-
-              {/* ----------------------------------------- */}
-              {/* CONFIDENCE */}
-              {/* ----------------------------------------- */}
-
-              <span>
-                <span
-                  className={`confidence-mini ${
-                    patient.confidence
-                      ? patient.confidence.toLowerCase()
-                      : ""
-                  }`}
-                >
-                  {patient.confidence || "N/A"}
+                <span>
+                  <span
+                    className={`confidence-mini ${
+                      patient.confidence
+                        ? patient.confidence.toLowerCase()
+                        : ""
+                    }`}
+                  >
+                    {patient.confidence || "N/A"}
+                  </span>
                 </span>
-              </span>
 
-              {/* ----------------------------------------- */}
-              {/* REASSESSMENT */}
-              {/* ----------------------------------------- */}
+                {/* ----------------------------------------- */}
+                {/* REASSESSMENT */}
+                {/* ----------------------------------------- */}
 
-              <span>
-                {(() => {
-                  const remaining =
-                    getRemainingSeconds(patient);
-
-                  if (
-                    patient.queue_status ===
-                      "REASSESSMENT_DUE" ||
-                    remaining === 0
-                  ) {
-                    return (
-                      <span className="reassessment-due">
-                        ⚠ DUE
-                      </span>
-                    );
-                  }
-
-                  return (
+                <span>
+                  {reassessmentDue ? (
+                    <span className="reassessment-due">
+                      ⚠ DUE
+                    </span>
+                  ) : (
                     <span
                       className={`queue-countdown ${
                         remaining !== null &&
@@ -1433,65 +1523,63 @@ const uncertaintyPercent =
                     >
                       {formatQueueTime(remaining)}
                     </span>
-                  );
-                })()}
-              </span>
-
-              {/* ----------------------------------------- */}
-              {/* DECISION */}
-              {/* ----------------------------------------- */}
-
-              <span>
-                <span
-                  className={`decision ${
-                    patient.decision
-                      ? patient.decision.toLowerCase()
-                      : ""
-                  }`}
-                >
-                  {patient.decision === "PENDING"
-                    ? "⚠ PENDING REVIEW"
-                    : patient.decision}
+                  )}
                 </span>
-              </span>
 
-              {/* ----------------------------------------- */}
-              {/* ACTIONS */}
-              {/* ----------------------------------------- */}
+                {/* ----------------------------------------- */}
+                {/* DECISION */}
+                {/* ----------------------------------------- */}
 
-              <div className="queue-actions">
+                <span>
+                  <span
+                    className={`decision ${
+                      patient.decision
+                        ? patient.decision.toLowerCase()
+                        : ""
+                    }`}
+                  >
+                    {patient.decision === "PENDING"
+                      ? "⚠ PENDING REVIEW"
+                      : patient.decision}
+                  </span>
+                </span>
 
-                <button
-                  className="view-button"
-                  onClick={() =>
-                    onSelectPatient(
-                      patient.patient_id
-                    )
-                  }
-                >
-                  View
-                </button>
+                {/* ----------------------------------------- */}
+                {/* ACTIONS */}
+                {/* ----------------------------------------- */}
 
-                {(
-                  patient.queue_status ===
-                  "REASSESSMENT_DUE" ||
-                  getRemainingSeconds(patient) === 0
-                ) && (
+                <div className="queue-actions">
+
+                  {reassessmentDue && (
+                    <button
+                      className="reassess-button"
+                      onClick={() =>
+                        handleReassess(
+                          patient.patient_id
+                        )
+                      }
+                    >
+                      ↻ Reassess
+                    </button>
+                  )}
+
                   <button
-                    className="reassess-button"
+                    className="view-button"
                     onClick={() =>
-                      handleReassess(
+                      onSelectPatient(
                         patient.patient_id
                       )
                     }
                   >
-                    Reassess
+                    View
                   </button>
-                )}
+
+                </div>
 
               </div>
-            </div>
-          ))}
+            );
+          })}
+
         </div>
       )}
     </div>
@@ -1504,25 +1592,22 @@ const uncertaintyPercent =
       <div className="warning-icon">!</div>
 
       <div>
-        <strong>
-          Clinical oversight required
-        </strong>
+        <strong>Clinical oversight required</strong>
 
         <p>
-          AI recommendations are advisory. Nurses can
-          review, modify, or escalate every triage
-          recommendation.
+          AI recommendations are advisory. Nurses can review,
+          modify, or escalate every triage recommendation.
         </p>
       </div>
     </div>
 
     <p className="disclaimer">
-      Prototype system using synthetic data. AI output is
-      a recommendation only and requires clinical review.
+      Prototype system using synthetic data. AI output is a
+      recommendation only and requires clinical review.
     </p>
+
   </section>
 );
-
 }
 
 export default App;
