@@ -1,0 +1,134 @@
+import os
+import numpy as np
+import pandas as pd
+from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
+
+np.random.seed(42)
+
+N = 3000
+
+data = pd.DataFrame({
+    "age": np.random.randint(18, 90, N),
+    "heart_rate": np.random.randint(50, 150, N),
+    "spo2": np.random.randint(85, 100, N),
+    "systolic_bp": np.random.randint(80, 190, N),
+    "temperature": np.round(np.random.uniform(35.5, 40.5, N), 1),
+    "respiratory_rate": np.random.randint(10, 35, N),
+    "pain_level": np.random.randint(0, 11, N),
+
+    "chest_pain": np.random.randint(0, 2, N),
+    "shortness_breath": np.random.randint(0, 2, N),
+    "confusion": np.random.randint(0, 2, N),
+    "weakness": np.random.randint(0, 2, N),
+    "speech_problem": np.random.randint(0, 2, N),
+    "severe_bleeding": np.random.randint(0, 2, N),
+
+    "cardiac_history": np.random.randint(0, 2, N),
+    "diabetes": np.random.randint(0, 2, N),
+    "hypertension": np.random.randint(0, 2, N),
+    "previous_stroke": np.random.randint(0, 2, N),
+})
+
+# Synthetic triage score used ONLY to generate prototype training labels.
+score = (
+    (data["chest_pain"] * 3)
+    + (data["shortness_breath"] * 2)
+    + (data["confusion"] * 4)
+    + (data["weakness"] * 3)
+    + (data["speech_problem"] * 5)
+    + (data["severe_bleeding"] * 5)
+    + (data["cardiac_history"] * 2)
+    + (data["previous_stroke"] * 3)
+    + (data["pain_level"] >= 7) * 2
+    + (data["heart_rate"] >= 120) * 2
+    + (data["spo2"] < 94) * 4
+    + (data["systolic_bp"] < 90) * 4
+    + (data["temperature"] >= 39) * 1
+    + (data["respiratory_rate"] >= 25) * 2
+)
+
+# 0 = LOW
+# 1 = MEDIUM
+# 2 = HIGH
+# 3 = CRITICAL
+
+data["risk"] = pd.cut(
+    score,
+    bins=[-1, 3, 6, 10, 100],
+    labels=[0, 1, 2, 3]
+).astype(int)
+
+features = [
+    "age",
+    "heart_rate",
+    "spo2",
+    "systolic_bp",
+    "temperature",
+    "respiratory_rate",
+    "pain_level",
+    "chest_pain",
+    "shortness_breath",
+    "confusion",
+    "weakness",
+    "speech_problem",
+    "severe_bleeding",
+    "cardiac_history",
+    "diabetes",
+    "hypertension",
+    "previous_stroke",
+]
+
+X = data[features]
+y = data["risk"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+model = XGBClassifier(
+    n_estimators=150,
+    max_depth=4,
+    learning_rate=0.08,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    objective="multi:softprob",
+    num_class=4,
+    eval_metric="mlogloss",
+    random_state=42
+)
+
+model.fit(X_train, y_train)
+
+predictions = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, predictions)
+
+print("Model trained successfully.")
+print(f"Prototype validation accuracy: {accuracy:.2%}")
+
+# Save dataset
+os.makedirs("data", exist_ok=True)
+
+data.to_csv(
+    "data/synthetic_patients.csv",
+    index=False
+)
+
+# Save model
+joblib.dump(
+    {
+        "model": model,
+        "features": features
+    },
+    "triage_model.pkl"
+)
+
+print("Dataset saved to: data/synthetic_patients.csv")
+print("Model saved to: triage_model.pkl")
