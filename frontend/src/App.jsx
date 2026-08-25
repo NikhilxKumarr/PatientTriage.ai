@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
 const API_URL = "http://127.0.0.1:8000";
@@ -37,6 +37,40 @@ function App() {
   const [page, setPage] = useState("intake");
   const [patients, setPatients] = useState([]);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
+
+  useEffect(() => {
+    if (remainingSeconds === null || remainingSeconds <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setRemainingSeconds((previous) => {
+        if (previous <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [remainingSeconds]);
+
+  function formatTime(seconds) {
+    if (seconds === null) {
+      return "--:--";
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(
+      2,
+      "0",
+    )}`;
+  }
 
   function updateField(field, value) {
     setForm((previous) => ({
@@ -75,6 +109,7 @@ function App() {
       const data = await response.json();
 
       setResult(data);
+      setRemainingSeconds(data.reassessment_minutes * 60);
     } catch (err) {
       setError(
         "Could not connect to PatientTriage.ai backend. Make sure FastAPI is running on port 8000.",
@@ -167,6 +202,7 @@ function App() {
     setResult(null);
     setDecision(null);
     setError("");
+    setRemainingSeconds(null);
   }
 
   return (
@@ -567,10 +603,18 @@ function App() {
                 </p>
               </div>
 
-              <div className="reassessment">
+            <div
+                className={`reassessment ${
+                  remainingSeconds !== null && remainingSeconds <= 60
+                    ? "urgent"
+                    : ""
+                }`}
+              >
                 <span>REASSESSMENT</span>
 
-                <strong>{result.reassessment_minutes}:00</strong>
+                <strong>
+                   {formatTime(remainingSeconds)}
+                </strong>
 
                 <small>minutes</small>
               </div>
@@ -628,6 +672,7 @@ function App() {
                 setResult(null);
                 setDecision(null);
                 setError("");
+                setRemainingSeconds(null);
               }}
             >
               ← Assess another patient

@@ -948,3 +948,17 @@ textarea:focus {
   font-size: 11px;
 }
 
+.reassessment {
+  transition: all 0.2s ease;
+}
+
+.reassessment.urgent {
+  background: #ffe7e7;
+  border-radius: 9px;
+  padding: 12px 18px;
+  border-left: 1px solid #e5aaaa;
+}
+
+.reassessment.urgent strong {
+  color: #c62828;
+}
