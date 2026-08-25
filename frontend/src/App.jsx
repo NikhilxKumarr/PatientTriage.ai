@@ -196,6 +196,61 @@ function App() {
     setDecision(null);
     loadPatients();
   }
+async function openPatient(patientId) {
+  setError("");
+
+  try {
+    const response = await fetch(
+      `${API_URL}/patients/${patientId}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Unable to load patient");
+    }
+
+    const data = await response.json();
+
+    // The detail endpoint returns:
+    // {
+    //   patient_id,
+    //   data,
+    //   result,
+    //   decision,
+    //   note
+    // }
+    //
+    // Normalize it into the same structure
+    // used by the intake endpoint.
+
+    const patientResult = {
+      ...data.result,
+      patient_id: data.patient_id,
+      patient_data: data.data,
+      decision: data.decision,
+      note: data.note,
+    };
+
+    setResult(patientResult);
+
+    setDecision(
+      data.decision && data.decision !== "PENDING"
+        ? data.decision
+        : null
+    );
+
+    // Existing patients are not given a fake
+    // live countdown.
+    setRemainingSeconds(null);
+
+    setPage("intake");
+
+  } catch (err) {
+    console.error(err);
+    setError("Could not load the selected patient.");
+  }
+}
+
+
 
   function openIntake() {
     setPage("intake");
@@ -243,14 +298,11 @@ function App() {
       <main className="container">
         {page === "dashboard" ? (
           <Dashboard
-            patients={patients}
-            loading={dashboardLoading}
-            onRefresh={loadPatients}
-            onSelectPatient={(patient) => {
-              setResult(patient);
-              setPage("intake");
-            }}
-          />
+              patients={patients}
+              loading={dashboardLoading}
+              onRefresh={loadPatients}
+              onSelectPatient={openPatient}
+            />
         ) : !result ? (
           <form onSubmit={assessPatient}>
             <section className="hero">
@@ -603,7 +655,7 @@ function App() {
                 </p>
               </div>
 
-            <div
+              <div
                 className={`reassessment ${
                   remainingSeconds !== null && remainingSeconds <= 60
                     ? "urgent"
@@ -612,11 +664,17 @@ function App() {
               >
                 <span>REASSESSMENT</span>
 
-                <strong>
-                   {formatTime(remainingSeconds)}
+              <strong>
+                  {remainingSeconds !== null
+                    ? formatTime(remainingSeconds)
+                    : `${result.reassessment_minutes} min`}
                 </strong>
 
-                <small>minutes</small>
+                <small>
+                  {remainingSeconds !== null
+                    ? "remaining"
+                    : "assigned interval"}
+                </small>
               </div>
             </div>
 
@@ -784,10 +842,10 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
                 </span>
 
                 <button
-                  className="view-button"
-                  onClick={() => onSelectPatient(patient)}
-                >
-                  View
+                    className="view-button"
+                    onClick={() => onSelectPatient(patient.patient_id)}
+                  >
+                    View
                 </button>
               </div>
             ))}
