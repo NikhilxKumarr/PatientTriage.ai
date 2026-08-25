@@ -108,7 +108,11 @@ function App() {
 
       const data = await response.json();
 
-      setResult(data);
+      setResult({
+        ...data,
+        patient_data: form,
+      });
+
       setRemainingSeconds(data.reassessment_minutes * 60);
     } catch (err) {
       setError(
@@ -196,61 +200,54 @@ function App() {
     setDecision(null);
     loadPatients();
   }
-async function openPatient(patientId) {
-  setError("");
+  async function openPatient(patientId) {
+    setError("");
 
-  try {
-    const response = await fetch(
-      `${API_URL}/patients/${patientId}`
-    );
+    try {
+      const response = await fetch(`${API_URL}/patients/${patientId}`);
 
-    if (!response.ok) {
-      throw new Error("Unable to load patient");
+      if (!response.ok) {
+        throw new Error("Unable to load patient");
+      }
+
+      const data = await response.json();
+
+      // The detail endpoint returns:
+      // {
+      //   patient_id,
+      //   data,
+      //   result,
+      //   decision,
+      //   note
+      // }
+      //
+      // Normalize it into the same structure
+      // used by the intake endpoint.
+
+      const patientResult = {
+        ...data.result,
+        patient_id: data.patient_id,
+        patient_data: data.data,
+        decision: data.decision,
+        note: data.note,
+      };
+
+      setResult(patientResult);
+
+      setDecision(
+        data.decision && data.decision !== "PENDING" ? data.decision : null,
+      );
+
+      // Existing patients are not given a fake
+      // live countdown.
+      setRemainingSeconds(null);
+
+      setPage("intake");
+    } catch (err) {
+      console.error(err);
+      setError("Could not load the selected patient.");
     }
-
-    const data = await response.json();
-
-    // The detail endpoint returns:
-    // {
-    //   patient_id,
-    //   data,
-    //   result,
-    //   decision,
-    //   note
-    // }
-    //
-    // Normalize it into the same structure
-    // used by the intake endpoint.
-
-    const patientResult = {
-      ...data.result,
-      patient_id: data.patient_id,
-      patient_data: data.data,
-      decision: data.decision,
-      note: data.note,
-    };
-
-    setResult(patientResult);
-
-    setDecision(
-      data.decision && data.decision !== "PENDING"
-        ? data.decision
-        : null
-    );
-
-    // Existing patients are not given a fake
-    // live countdown.
-    setRemainingSeconds(null);
-
-    setPage("intake");
-
-  } catch (err) {
-    console.error(err);
-    setError("Could not load the selected patient.");
   }
-}
-
-
 
   function openIntake() {
     setPage("intake");
@@ -298,11 +295,11 @@ async function openPatient(patientId) {
       <main className="container">
         {page === "dashboard" ? (
           <Dashboard
-              patients={patients}
-              loading={dashboardLoading}
-              onRefresh={loadPatients}
-              onSelectPatient={openPatient}
-            />
+            patients={patients}
+            loading={dashboardLoading}
+            onRefresh={loadPatients}
+            onSelectPatient={openPatient}
+          />
         ) : !result ? (
           <form onSubmit={assessPatient}>
             <section className="hero">
@@ -606,6 +603,126 @@ async function openPatient(patientId) {
               </div>
             </div>
 
+            {result.patient_data && (
+              <div className="card patient-detail-card">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">PATIENT DETAILS</p>
+                    <h2>Clinical snapshot</h2>
+                  </div>
+                </div>
+
+                <div className="patient-vitals">
+                  <div className="vital">
+                    <span>AGE</span>
+                    <strong>{result.patient_data.age}</strong>
+                    <small>years</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>HEART RATE</span>
+                    <strong>{result.patient_data.heart_rate}</strong>
+                    <small>bpm</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>SpO₂</span>
+                    <strong>{result.patient_data.spo2}%</strong>
+                    <small>oxygen saturation</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>BLOOD PRESSURE</span>
+                    <strong>{result.patient_data.systolic_bp}</strong>
+                    <small>mmHg systolic</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>TEMPERATURE</span>
+                    <strong>{result.patient_data.temperature}°</strong>
+                    <small>Celsius</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>RESPIRATORY RATE</span>
+                    <strong>{result.patient_data.respiratory_rate}</strong>
+                    <small>breaths/min</small>
+                  </div>
+
+                  <div className="vital">
+                    <span>PAIN LEVEL</span>
+                    <strong>{result.patient_data.pain_level}/10</strong>
+                    <small>reported pain</small>
+                  </div>
+                </div>
+
+                <div className="patient-context">
+                  <div className="context-block">
+                    <p className="context-label">CHIEF COMPLAINT</p>
+                    <strong>
+                      {result.patient_data.chief_complaint || "Not provided"}
+                    </strong>
+                  </div>
+
+                  <div className="context-block">
+                    <p className="context-label">PATIENT'S OWN WORDS</p>
+                    <p className="patient-words">
+                      "{result.patient_data.patient_words || "Not provided"}"
+                    </p>
+                  </div>
+                </div>
+
+                <div className="history-section">
+                  <p className="context-label">MEDICAL HISTORY</p>
+
+                  <div className="history-list">
+                    <span
+                      className={
+                        result.patient_data.cardiac_history
+                          ? "history active"
+                          : "history"
+                      }
+                    >
+                      {result.patient_data.cardiac_history ? "✓" : "○"} Cardiac
+                      history
+                    </span>
+
+                    <span
+                      className={
+                        result.patient_data.diabetes
+                          ? "history active"
+                          : "history"
+                      }
+                    >
+                      {result.patient_data.diabetes ? "✓" : "○"} Diabetes
+                    </span>
+
+                    <span
+                      className={
+                        result.patient_data.hypertension
+                          ? "history active"
+                          : "history"
+                      }
+                    >
+                      {result.patient_data.hypertension ? "✓" : "○"}{" "}
+                      Hypertension
+                    </span>
+
+                    <span
+                      className={
+                        result.patient_data.previous_stroke
+                          ? "history active"
+                          : "history"
+                      }
+                    >
+                      {result.patient_data.previous_stroke ? "✓" : "○"} Previous
+                      stroke
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="card">
               <div className="section-heading">
                 <div>
@@ -664,7 +781,7 @@ async function openPatient(patientId) {
               >
                 <span>REASSESSMENT</span>
 
-              <strong>
+                <strong>
                   {remainingSeconds !== null
                     ? formatTime(remainingSeconds)
                     : `${result.reassessment_minutes} min`}
@@ -842,10 +959,10 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
                 </span>
 
                 <button
-                    className="view-button"
-                    onClick={() => onSelectPatient(patient.patient_id)}
-                  >
-                    View
+                  className="view-button"
+                  onClick={() => onSelectPatient(patient.patient_id)}
+                >
+                  View
                 </button>
               </div>
             ))}
