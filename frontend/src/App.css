@@ -1128,3 +1128,11 @@ textarea:focus {
   border-color: #bcd7fb;
   color: #1c63c9;
 }
+
+
+.factor-detail {
+  margin: 4px 0 0;
+  color: #7b8797;
+  font-size: 11px;
+  line-height: 1.4;
+}

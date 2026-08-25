@@ -738,19 +738,28 @@ function App() {
               {result.key_factors.length > 0 ? (
                 <div className="factor-list">
                   {result.key_factors.map((factor, index) => (
+
                     <div className="factor" key={index}>
                       <div className="factor-main">
                         <div
                           className={`factor-indicator ${factor.impact.toLowerCase()}`}
                         />
 
-                        <strong>{factor.factor}</strong>
+                        <div>
+                          <strong>{factor.factor}</strong>
+
+                          {factor.detail && (
+                            <p className="factor-detail">{factor.detail}</p>
+                          )}
+                        </div>
                       </div>
 
                       <span className={`impact ${factor.impact.toLowerCase()}`}>
                         {factor.impact} IMPACT
                       </span>
                     </div>
+
+                    
                   ))}
                 </div>
               ) : (
@@ -869,20 +878,17 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
   const low = patients.filter((p) => p.risk_level === "LOW").length;
 
-  const pending = patients.filter(
-  (p) => p.decision === "PENDING"
-    ).length;
+  const pending = patients.filter((p) => p.decision === "PENDING").length;
 
+  const filteredPatients = patients.filter((patient) => {
+    if (filter === "ALL") return true;
 
-    const filteredPatients = patients.filter((patient) => {
-  if (filter === "ALL") return true;
+    if (filter === "PENDING") {
+      return patient.decision === "PENDING";
+    }
 
-  if (filter === "PENDING") {
-    return patient.decision === "PENDING";
-  }
-
-  return patient.risk_level === filter;
-});
+    return patient.risk_level === filter;
+  });
 
   return (
     <section>
@@ -901,61 +907,62 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
           ↻ Refresh
         </button>
       </div>
-        <div className="stats">
-          <div className="stat critical">
-            <span>CRITICAL</span>
-            <strong>{critical}</strong>
-          </div>
-
-          <div className="stat high">
-            <span>HIGH</span>
-            <strong>{high}</strong>
-          </div>
-
-          <div className="stat medium">
-            <span>MEDIUM</span>
-            <strong>{medium}</strong>
-          </div>
-
-          <div className="stat low">
-            <span>LOW</span>
-            <strong>{low}</strong>
-          </div>
-
-          <div className="stat pending">
-            <span>PENDING REVIEW</span>
-            <strong>{pending}</strong>
-          </div>
+      <div className="stats">
+        <div className="stat critical">
+          <span>CRITICAL</span>
+          <strong>{critical}</strong>
         </div>
+
+        <div className="stat high">
+          <span>HIGH</span>
+          <strong>{high}</strong>
+        </div>
+
+        <div className="stat medium">
+          <span>MEDIUM</span>
+          <strong>{medium}</strong>
+        </div>
+
+        <div className="stat low">
+          <span>LOW</span>
+          <strong>{low}</strong>
+        </div>
+
+        <div className="stat pending">
+          <span>PENDING REVIEW</span>
+          <strong>{pending}</strong>
+        </div>
+      </div>
 
       <div className="card">
         <div className="queue-header">
           <div>
             <h2>Priority queue</h2>
 
-            <p>Highest-risk patients appear first. Pending cases require nurse review.</p>
+            <p>
+              Highest-risk patients appear first. Pending cases require nurse
+              review.
+            </p>
           </div>
 
           <span className="patient-count">
-                {filteredPatients.length} patients
-              </span>
+            {filteredPatients.length} patients
+          </span>
         </div>
 
         <div className="queue-filters">
-            {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "PENDING"].map(
-              (item) => (
-                <button
-                  key={item}
-                  className={`filter-button ${
-                    filter === item ? "active" : ""
-                  }`}
-                  onClick={() => setFilter(item)}
-                >
-                  {item}
-                </button>
-              )
-            )}
-          </div>
+          {["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "PENDING"].map(
+            (item) => (
+              <button
+                key={item}
+                className={`filter-button ${filter === item ? "active" : ""}`}
+                onClick={() => setFilter(item)}
+              >
+                {item}
+              </button>
+            ),
+          )}
+        </div>
 
         {loading ? (
           <div className="empty">Loading patient queue...</div>
@@ -972,15 +979,13 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
               <span></span>
             </div>
 
-           {filteredPatients.map((patient) => (
-             <div
-                  className={`table-row ${
-                    patient.decision === "PENDING"
-                      ? "pending-row"
-                      : ""
-                  }`}
-                  key={patient.patient_id}
-                >
+            {filteredPatients.map((patient) => (
+              <div
+                className={`table-row ${
+                  patient.decision === "PENDING" ? "pending-row" : ""
+                }`}
+                key={patient.patient_id}
+              >
                 <span className="patient-id">{patient.patient_id}</span>
 
                 <span>
@@ -997,11 +1002,11 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
 
                 <span>
                   <span
-                         className={`decision ${patient.decision.toLowerCase()}`}
-                >
+                    className={`decision ${patient.decision.toLowerCase()}`}
+                  >
                     {patient.decision === "PENDING"
-                            ? "⚠ PENDING REVIEW"
-                            : patient.decision}
+                      ? "⚠ PENDING REVIEW"
+                      : patient.decision}
                   </span>
                 </span>
 

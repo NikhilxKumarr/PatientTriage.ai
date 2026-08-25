@@ -75,61 +75,71 @@ def intake(patient: PatientInput):
     if patient.chest_pain:
         factors.append({
             "factor": "Chest pain",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Patient reports active chest pain"
         })
 
     if patient.shortness_breath:
         factors.append({
             "factor": "Shortness of breath",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Patient reports difficulty breathing"
         })
 
     if patient.confusion:
         factors.append({
             "factor": "Confusion",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Altered mental state reported"
         })
 
     if patient.speech_problem:
         factors.append({
             "factor": "Speech difficulty",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Speech difficulty reported"
         })
 
     if patient.severe_bleeding:
         factors.append({
             "factor": "Severe bleeding",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Significant bleeding reported"
         })
 
     if patient.heart_rate >= 120:
         factors.append({
-            "factor": f"Elevated heart rate ({patient.heart_rate} bpm)",
-            "impact": "MEDIUM"
+            "factor": "Elevated heart rate",
+            "impact": "MEDIUM",
+            "detail": f"{patient.heart_rate} bpm"
         })
 
     if patient.spo2 < 94:
         factors.append({
-            "factor": f"Low SpO₂ ({patient.spo2}%)",
-            "impact": "HIGH"
+            "factor": "Low SpO₂",
+            "impact": "HIGH",
+            "detail": f"{patient.spo2}% oxygen saturation"
         })
 
     if patient.pain_level >= 7:
         factors.append({
-            "factor": f"Severe pain ({patient.pain_level}/10)",
-            "impact": "MEDIUM"
+            "factor": "Severe pain",
+            "impact": "MEDIUM",
+            "detail": f"{patient.pain_level}/10 reported pain"
         })
 
     if patient.cardiac_history:
         factors.append({
             "factor": "Cardiac history",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Previous cardiac condition reported"
         })
 
     if patient.previous_stroke:
         factors.append({
             "factor": "Previous stroke",
-            "impact": "HIGH"
+            "impact": "HIGH",
+            "detail": "Previous stroke reported"
         })
 
     result = {
