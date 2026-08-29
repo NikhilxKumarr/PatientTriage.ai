@@ -320,11 +320,12 @@ function App() {
 
       <main className="container">
         {page === "dashboard" ? (
-          <Dashboard
+            <Dashboard
             patients={patients}
             loading={dashboardLoading}
             onRefresh={loadPatients}
             onSelectPatient={openPatient}
+            onReassess={handleReassess}
           />
         ) : !result ? (
           <form onSubmit={assessPatient}>
@@ -1046,8 +1047,13 @@ function App() {
     </div>
   );
 }
-function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
-  const [filter, setFilter] = useState("ALL");
+function Dashboard({
+  patients,
+  loading,
+  onRefresh,
+  onSelectPatient,
+  onReassess,
+}) {  const [filter, setFilter] = useState("ALL");
 
   const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -1544,37 +1550,38 @@ function Dashboard({ patients, loading, onRefresh, onSelectPatient }) {
                   </span>
                 </span>
 
-                {/* ----------------------------------------- */}
-                {/* ACTIONS */}
-                {/* ----------------------------------------- */}
+                        
+          {/* ----------------------------------------- */}
+          {/* ACTIONS */}
+          {/* ----------------------------------------- */}
 
-                <div className="queue-actions">
+          <div className="queue-actions">
 
-                  {reassessmentDue && (
-                    <button
-                      className="reassess-button"
-                      onClick={() =>
-                        handleReassess(
-                          patient.patient_id
-                        )
-                      }
-                    >
-                      ↻ Reassess
-                    </button>
-                  )}
+          {/* Reassess only this patient when their
+      reassessment is actually due */}
 
-                  <button
-                    className="view-button"
-                    onClick={() =>
-                      onSelectPatient(
-                        patient.patient_id
-                      )
-                    }
-                  >
-                    View
-                  </button>
+          {(
+            patient.queue_status === "REASSESSMENT_DUE" ||
+            getRemainingSeconds(patient) === 0
+          ) && (
+            <button
+              type="button"
+              className="reassess-button"
+              onClick={() => onReassess(patient.patient_id)}
+            >
+              ↻ Reassess
+            </button>
+          )}
 
-                </div>
+            <button
+              type="button"
+              className="view-button"
+              onClick={() => onSelectPatient(patient.patient_id)}
+            >
+              View
+            </button>
+
+          </div>
 
               </div>
             );
